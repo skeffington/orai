@@ -1,0 +1,117 @@
+---
+title: "Orai channel evolution in Haptophytes"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(data.table)
+library(msa)
+library(ggmsa)
+library(DECIPHER)
+library(microseq)
+```
+
+
+Step 1: Gather a collection of bone-fide Orai proteins from across ToL
+
+D malanogaster
+Human Orai 1, 2, 3
+C elegans
+Danio rerio
+C reinhardii ??
+Physcomatrella patans
+T pseudonana
+Haptophyte sequences from across Danijela's tree
+
+```{r}
+
+orai_sel<-readAAStringSet("orai_select.fasta")
+
+orai_sel_aln<-msa(orai_sel, method="Muscle")
+print(orai_sel_aln, show="complete")
+
+msaPrettyPrint(orai_sel_aln, output="pdf", showNames="left", showLogo="none", askForOverwrite=FALSE, verbose=FALSE)
+
+msaPrettyPrint(orai_sel_aln, y=c(164, 213), output="asis", showNames="left", showLogo="none", askForOverwrite=FALSE)
+
+ggmsa(orai_sel, 300, 350, color = "Clustal", font = "DroidSansMono", char_width = 0.5, seq_name = TRUE )
+
+p <- ggmsa(protein_sequences, 300, 350, char_width = 0.5, seq_name = TRUE) + geom_msaBar()
+
+
+ggsave("p.png",p, height = 2,width = 8)
+```
+
+
+
+```{r}
+
+orai_sel_daln<-AlignSeqs(orai_sel)
+orai_sel_daln_adj <- AdjustAlignment(orai_sel_daln)
+BrowseSeqs(orai_sel_daln_adj, highlight=0)
+writeXStringSet(orai_sel_daln_adj, "orai_sel_sln.fasta")
+
+orai_sel_alnfa<-readFasta("orai_sel_sln.fasta")
+orai_sel_trim<-msaTrim(orai_sel_alnfa, gap.end= 0.5, gap.mid = 1)
+writeFasta(orai_sel_trim, "orai_sel_sln_trim.fasta")
+
+orai_trim<-readAAStringSet("orai_sel_sln_trim.fasta")
+orai_sel_daln_adj_trim_adj <- AdjustAlignment(orai_trim)
+BrowseSeqs(orai_sel_daln_adj_trim_adj, highlight=0)
+
+```
+
+MAFT = 
+L-INS-i (Probably most accurate, very slow)
+% mafft --reorder --dash --originalseqonly --auto input 
+
+
+MAFT dash =
+L-INS-i (Probably most accurate, very slow) 
+ mafft-homologs.rb -N 8 -l -d uniref50 -o '--reorder --dash --originalseqonly --auto' -a 50 -e 1.0e-30 -s input 
+
+
+```{r}
+orai_maft<-readAAStringSet("orai_sel_maft.fasta")
+BrowseSeqs(orai_maft, highlight=0)
+
+BrowseSeqs(orai_maft, patterns=c("[MFL][VL]E", "LAEV"), colors = c("#74eb34", "#94d9eb"))
+
+domains=c(Basic1 = "SRA",
+          Basic2 = "LKA",
+          Basic3 = "SRT",
+          hyd1 = "ALL",
+          hyd2 = "GFA",
+          hyd3 = "MVA",
+          sel1 = "VEV",
+          sel2 = "LAEV",
+          CAR = "DADHD",
+          ETON = "ALSWRKLYLSRAKLKAS",
+          TM4bend="MVPF",
+          TM4ex = "RQFQE")
+
+colset = c(rep("#ace34d", 3), rep("#85898f", 3), rep("#e82f1e", 2), "#f2e15e", "#67cee0", "#2c7cc7", "#913bed")
+
+BrowseSeqs(orai_maft, patterns=domains, colors = colset)
+
+
+```
+
+Pore region: Basic domain R83, K87, R91 + hydrophobic L95, F99, and V102 + selectivity: E106
+First extracellular loop: D110, D112, D114 : calcium accumulating (CAR: ensures works in low Ca conditions)
+ETON: an alpha helix of the TM1 domain extends to cytoplasm and requried for STIM1 association and channel gaing.
+TM4 extended region: 268 -291: association of neighboring subunits. RQFQELNELAEFARLQDQLDHRG.
+C-terminal is main STIM one binding site
+Prolein 245 is required for hte kink in TM4
+
+Step 2: Build profiles (hmmer or mmseq2)
+
+Step 3: Search target sequence databases from EukProt, JGI etc. 
+
+Step 4: Phylogenies with: Full prot, central region, Nt, Ct
+
+Step 5: domain and key residue annotations in clades
+
+
+Step 6: Figures
