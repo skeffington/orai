@@ -5,6 +5,7 @@ output: html_notebook
 
 ```{r}
 library(tidyverse)
+library(magrittr)
 library(data.table)
 library(msa)
 library(ggmsa)
@@ -12,8 +13,45 @@ library(DECIPHER)
 library(microseq)
 ```
 
+Key links for phylogeny:
+
+
+
 
 Step 1: Gather a collection of bone-fide Orai proteins from across ToL
+
+Emihu2_haploid_allproteins_sn.fasta          EP00324_Dicrateria_rotunda.fasta
+EP00006_Acanthamoeba_castellanii.fasta       EP00325_Prymnesiales_sp_UTEX-LB-985.fasta
+EP00024_Dictyostelium_purpureum.fasta        EP00326_Haptolina_ericina.fasta
+EP00046_Monosiga_brevicollis.fasta           EP00327_Prymnesium_parvum.fasta
+EP00134_Neurospora_crassa.fasta              EP00425_Heterocapsa_triquetra.fasta
+EP00136_Aspergillus_niger.fasta              EP00427_Karlodinium_veneficum.fasta
+EP00144_Saccharomyces_cerevisiae.fasta       EP00428_Durinskia_dybowskii.fasta
+EP00163_Fabomonas_tropica.fasta              EP00429_Kryptoperidinium_foliaceum.fasta
+EP00164_Ancoracysta_twista.fasta             EP00480_Reticulomyxa_filosa.fasta
+EP00185_Porphyridium_purpureum.fasta         EP00530_Phaeodactylum_tricornutum.fasta
+EP00198_Chlamydomonas_reinhardtii.fasta      EP00582_Thalassiosira_oceanica.fasta
+EP00202_Volvox_carteri.fasta                 EP00656_Telonema_subtile.fasta
+EP00224_Ostreococcus_tauri.fasta             EP00682_Trypanosoma_cruzi.fasta
+EP00298_Acanthocystis_sp_HF-20.fasta         EP00696_Hemimastix_kukwesjijk.fasta
+EP00299_Pterocystis_sp_00344.fasta           EP00697_Spironema_sp_BW2.fasta
+EP00300_Choanocystis_sp_HF-7.fasta           EP00770_Monocercomonoides_exilis.fasta
+EP00301_Raphidiophrys_heterophryoidea.fasta  EP00797_Seminavis_robusta.fasta
+EP00302_Diacronema_sp_CCMP2436.fasta         EP00822_Plasmodium_yoelii.fasta
+EP00303_Exanthemachrysis_gayraliae.fasta     EP00829_Urostomides_striatus.fasta
+EP00304_Pavlova_gyrans.fasta                 EP00900_Chrysochromulina_parva.fasta
+EP00306_Pavlova_sp_CCMP459.fasta             EP00908_Phaeocystis_cordata.fasta
+EP00307_Rebecca_sp_RCC1486.fasta             EP00934_Nitzschia_sp_Nitz4.fasta
+EP00308_Calcidiscus_leptoporus.fasta         EP00962_Isochrysis_galbana.fasta
+EP00310_Coccolithus_braarudii.fasta          EP00963_Diacronema_lutheri.fasta
+EP00312_Isochrysidales_sp_CCMP1244.fasta     EP00964_Phaeocystis_antarctica.fasta
+EP00314_Emiliania_huxleyi.fasta              EP00965_Chrysotila_dentata.fasta
+EP00315_Gephyrocapsa_oceanica.fasta          EP00966_Prymnesium_polylepis.fasta
+EP00316_Scyphosphaera_apsteinii.fasta        EP00967_Tisochrysis_lutea.fasta
+EP00320_Phaeocystis_rex.fasta                EP00977_Amphora_coffeiformis.fasta
+EP00322_Chrysochromulina_rotalis.fasta       EP01082_Thalassiosira_pseudonana.fasta
+EP00323_Chrysochromulina_tobinii.fasta       Phaglo1_GeneCatalog_proteins_20181013.aa.fasta
+
 
 D malanogaster
 Human Orai 1, 2, 3
@@ -105,13 +143,261 @@ TM4 extended region: 268 -291: association of neighboring subunits. RQFQELNELAEF
 C-terminal is main STIM one binding site
 Prolein 245 is required for hte kink in TM4
 
-Step 2: Build profiles (hmmer or mmseq2)
 
-Step 3: Search target sequence databases from EukProt, JGI etc. 
+```{}
 
-Step 4: Phylogenies with: Full prot, central region, Nt, Ct
+for i in *.fasta; do NAME=$(basename $i .fasta)_DB; mmseqs createdb $i $NAME; done
 
-Step 5: domain and key residue annotations in clades
+for i in *.fasta; do NAME=$(basename $i .fasta)_DB; OUT=$(basename $i .fasta)_SERDB; mmseqs search ../../psiDB $NAME $OUT tmp --num-iterations 12 -s 7.5 -e 1.000E-02; rm -r tmp; done
+
+for i in *.fasta; do NAME=$(basename $i .fasta)_DB; OUT=$(basename $i .fasta)_SERDB; TSV=$(basename $i .fasta)_search.tab; mmseqs convertalis ../../psiDB $NAME $OUT $TSV; done
+
+#Try more prots (seq4psi_fulllen.fasta) and full length. Only proteins confirmed with the conserved E106 as bait:
+
+for i in *.fasta; do NAME=$(basename $i .fasta)_DB; OUT=$(basename $i .fasta)_FLDB; mmseqs search ../../psiFL $NAME $OUT tmp --num-iterations 10 -s 7.5 -e 1.000E-01; rm -r tmp; done
+
+for i in *.fasta; do NAME=$(basename $i .fasta)_DB; OUT=$(basename $i .fasta)_FLDB; TSV=$(basename $i .fasta)_searchFL.tab; mmseqs convertalis ../../psiFL $NAME $OUT $TSV; done
 
 
-Step 6: Figures
+
+```
+
+
+
+Download from Interpro fasta files of :
+
+>
+> 
+
+And create profiles with mmseqs
+
+```{}
+mmseqs linclust cracIPDB cracIPDBclus tmp
+mmseqs createsubdb cracIPDBclus cracIPDB sequenceRepDb
+mmseqs createsubdb cracIPDBclus cracIPDB_h sequenceRepDb_h
+mmseqs result2profile sequenceRepDb cracIPDB cracIPDBclus cracIP_ProfileDb
+
+
+mmseqs linclust oraiSFDB oraiSFDBclus tmp
+mmseqs createsubdb oraiSFDBclus oraiSFDB sequenceRepDb
+mmseqs createsubdb oraiSFDBclus oraiSFDB_h sequenceRepDb_h
+mmseqs result2profile sequenceRepDb oraiSFDB oraiSFDBclus oraiSF_ProfileDb
+
+```
+
+
+Now do profile searches against the databases
+
+```{}
+
+for i in *.fasta; do NAME=$(basename $i .fasta)_DB; OUT=$(basename $i .fasta)_oraiSF_profSDB; mmseqs search /data2/orai/oraiSFip/oraiSF_ProfileDb $NAME $OUT tmp --num-iterations 3 -e 1.000E-02 -s 7.5; rm -r tmp; done
+
+for i in *.fasta; do NAME=$(basename $i .fasta)_DB; OUT=$(basename $i .fasta)_oraiSF_profSDB; TSV=$(basename $i .fasta)_oraiSF_profS.tab; mmseqs convertalis /data2/orai/oraiSFip/oraiSF_ProfileDb $NAME $OUT $TSV; done
+
+mv *_oraiSF_profSDB* *oraiSF_profS.tab oraiSF_profile_search
+
+for i in *.fasta; do NAME=$(basename $i .fasta)_DB; OUT=$(basename $i .fasta)_cracF_profSDB; mmseqs search /data2/orai/cracip/cracIP_ProfileDb $NAME $OUT tmp --num-iterations 3 -e 1.000E-02 -s 7.5; rm -r tmp; done
+
+for i in *.fasta; do NAME=$(basename $i .fasta)_DB; OUT=$(basename $i .fasta)_cracF_profSDB; TSV=$(basename $i .fasta)_cracF_profS.tab; mmseqs convertalis /data2/orai/cracip/cracIP_ProfileDb $NAME $OUT $TSV; done
+
+mv *cracF_profSDB* *cracF_profS.tab cracF_profile_searc
+
+#Looking at E hux results, even very low pid hits have orai pfam annotations...
+
+##Finally use hmmer to do serach against pfam profile:
+
+for i in *.fasta; do OUT=$(basename $i .fasta)_PF07856_hits.txt; OUT2=$(basename $i .fasta)_PF07856_output.txt; hmmsearch -E 1E-02 --cpu 30 --tblout $OUT --noali /data2/orai/crac.hmm $i > $OUT2 ; done
+
+```
+
+
+Danijela's sequences found via proteomics are not explicity in the braaruddii proteome here, so repeat all analyses on this set:
+
+```{}
+
+mmseqs search ../psiDB sturmBraDB sturm_orai_SERDB tmp --num-iterations 12 -s 7.5 -e 1.000E-02
+mmseqs convertalis ../psiDB sturmBraDB sturm_orai_SERDB sturm_orai_search.tab
+
+mmseqs search ../psiFL sturmBraDB sturm_orai_FLDB tmp --num-iterations 12 -s 7.5 -e 1.000E-02
+mmseqs convertalis ../psiFL sturmBraDB sturm_orai_FLDB sturm_orai_searchFL.tab
+
+mmseqs search /data2/orai/oraiSFip/oraiSF_ProfileDb sturmBraDB sturm_orai_oraiSF_profSDB tmp --num-iterations 3 -e 1.000E-02 -s 7.5
+mmseqs convertalis /data2/orai/oraiSFip/oraiSF_ProfileDb sturmBraDB sturm_orai_oraiSF_profSDB sturm_orai_oraiSF_profS.tab
+
+mmseqs search /data2/orai/cracip/cracIP_ProfileDb sturmBraDB sturm_orai_cracF_profSDB tmp --num-iterations 3 -e 1.000E-02 -s 7.5
+mmseqs convertalis /data2/orai/cracip/cracIP_ProfileDb sturmBraDB sturm_orai_cracF_profSDB sturm_orai_ocracF_profS.tab
+
+hmmsearch -E 1E-02 --cpu 30 --tblout sturm_orai_PF07856_hits.txt --noali /data2/orai/crac.hmm sturm_braarudii_orai.fasta > sturm_orai_PF07856_output.txt
+
+#mv to appropriate output folders.
+```
+
+cat to single results file for each search type.
+
+Now read all results and make a bit table of hits across all species, one row per protein
+
+
+```{r}
+
+#perl -p -e 's/(^([^\s]*\s*){17}).*$/$1/g' All_PF07856_hits.txt > All_PF07856_hits_v2.txt
+
+PFhits<-fread("/data2/orai/proteomes/chosen/05_PF07856_hits/All_PF07856_hits_v3.txt", sep=" ", header=FALSE)
+TMpsi<-fread("/data2/orai/proteomes/chosen/01_TMregion_psi_search/All_TMregion_psi_search.tab")
+FLpsi<-fread("/data2/orai/proteomes/chosen/02_FL_psi_search/All_FL_psi_search.tab")
+OraiSFpro<-fread("/data2/orai/proteomes/chosen/03_oraiSF_profile_search/All_oraiSF_profile_search.tab") %>% filter(V11 < 10^-20 & V3 > 0.7)
+cracFpro<-fread("/data2/orai/proteomes/chosen/04_cracF_profile_search/All_cracF_profile_search.tab") %>% filter(V11 < 10^-20 & V3 > 0.7)
+
+
+cracFpro %>% filter(V11 < 10^-20 & V3 > 0.7) %>% nrow()
+OraiSFpro %>% filter(V11 < 10^-20 & V3 > 0.7) %>% nrow()
+
+
+c(PFhits$V1, TMpsi$V2, FLpsi$V2, OraiSFpro$V2, cracFpro$V2) %>% as.character() %>% unique() %>% length()
+
+selectedids<-c(PFhits$V1, TMpsi$V2, FLpsi$V2, OraiSFpro$V2, cracFpro$V2) %>% as.character() %>% unique() 
+
+#write ID list
+write.table(selectedids, file="/data2/orai/proteomes/selectedprot_ids.txt", sep = "\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
+
+```
+
+Extract sequences to fasta with seqkit grep. Fasta file in 
+
+/data2/orai/putative/putative_orai.fasta
+
+```{}
+sed -i 's/*//g' putative_orai.fasta
+sed -r 's/>([^ ]*) .*$/>\1/g' putative_orai.fasta > putative_orai_sn.fasta
+
+
+./interproscan.sh -cpu 28 -i /data2/orai/putative/putative_orai_sn.fasta -f tsv -o orai_interpro.tsv
+
+```
+
+
+Combine analyses:
+
+
+```{r}
+
+orai_IP_oraiSF<-fread("/data2/orai/putative/orai_interpro.tsv") %>% filter(., str_detect(V13, "Orai") | str_detect(V13, "Calcium"))
+orai_IP_cracF<-fread("/data2/orai/putative/orai_interpro.tsv") %>% filter(., str_detect(V13, "Calcium"))
+
+PFhits_1<-PFhits %>% select(., V1, V5) %>% set_colnames(., c("ID", "Pfam_pval"))
+cracFpro_1<-cracFpro %>% select(., V2, V11) %>% group_by(V2) %>% summarise(min=min(V11)) %>% set_colnames(., c("ID", "crac_fam_prof_search_minPval"))
+OraiSFpro_1<-OraiSFpro %>% select(., V2, V11) %>% group_by(V2) %>% summarise(min=min(V11))  %>% set_colnames(., c("ID", "orai_superfam_prof_search_minPval"))
+FLpsi_1<-FLpsi %>% select(., V2, V11) %>% group_by(V2) %>% summarise(min=min(V11))  %>% set_colnames(., c("ID", "true_orai_fulllen_psi_search_minPval"))
+TMpsi_1<-TMpsi %>% select(., V2, V11) %>% group_by(V2) %>% summarise(min=min(V11))  %>% set_colnames(., c("ID", "true_orai_transmem_psi_search_minPval"))
+
+Orai_initial<-full_join(PFhits_1, cracFpro_1) %>% full_join(., OraiSFpro_1) %>% full_join(., FLpsi_1) %>% full_join(., TMpsi_1)
+
+Orai_initial<-Orai_initial %>% mutate(., IP_CRAC= Orai_initial$ID %in% orai_IP_cracF$V1)
+
+Orai_initial<-Orai_initial %>% mutate(., IP_ORAI= Orai_initial$ID %in% orai_IP_oraiSF$V1)
+
+
+```
+
+
+Refine protein set:
+
+```{r}
+
+Orai_initial %>% filter(., IP_CRAC == TRUE, IP_ORAI==TRUE ) #79
+Orai_initial %>% filter(., IP_CRAC == FALSE, IP_ORAI==TRUE ) #73
+Orai_initial %>% filter(., IP_CRAC == TRUE, IP_ORAI==FALSE ) #0
+
+Orai_initial %>% filter(., IP_CRAC == FALSE, IP_ORAI==FALSE ) #287
+Orai_initial_noIP<-Orai_initial %>% filter(., IP_CRAC == FALSE, IP_ORAI==FALSE,  )
+
+Orai_initial_noIP %>% filter(., ! is.na(crac_fam_prof_search_minPval) | ! is.na(orai_superfam_prof_search_minPval) | ! is.na(true_orai_transmem_psi_search_minPval))
+
+#So there are some reasonable candidates not identified by interpro as Orai SF. 
+#Full length psi searches finds a lot of additional candidates compared to transmembrane psi searches
+#there are a number of proteins where the only evidence is a weak full length psi hit. Or with only weak pfam hit
+
+#Define 2 protein sets:
+
+# Interpro Orai only: 152 proteins (incluing Ehux isoforms)
+
+Orai_initial_IPORAI<-Orai_initial %>% filter(., IP_ORAI ==TRUE) 
+Orai_set1<-Orai_initial %>% filter(., IP_ORAI ==TRUE) %>% .$ID
+write.table(Orai_set1, file="/data2/orai/putative/Orai_set1prot_ids.txt", sep = "\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
+
+
+# Interpro Orai or found in CRAC fam profile search or found in TM psi search #250
+
+Orai_set2<-Orai_initial %>% filter(., IP_ORAI ==TRUE | ! is.na(crac_fam_prof_search_minPval) | !is.na(true_orai_transmem_psi_search_minPval) ) %>% .$ID
+
+write.table(Orai_set2, file="/data2/orai/putative/Orai_set2prot_ids.txt", sep = "\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
+
+```
+
+Extract IDs and add in known Orais then make alignments in MAFFT
+
+# Set1
+
+Do initial MAFT / dash alignment
+Identify main TM region: 557-1262
+
+```{}
+
+#download: set1_initial_aln.fasta
+# Get main region
+
+seqkit subseq -r 557:1262 set1_initial_aln.fasta > set1_initial_aln_trim.fasta
+
+#remove aln positions:
+
+sed -r 's/-//g' set1_initial_aln_trim.fasta | seqtk seq > set1_initial_aln_trim_tidy.fasta
+
+remove EP00198 chlamy sequence (very long)
+
+Now align again with MAFT webserver: set1_trimmed_aln.fasta
+
+Make tree with IQtree
+```
+
+
+Set 1 next steps
+
+- check and remove Ehux isoforms
+- set1.1 -> msatrim internal and external sites -> IQtree
+- set1.2 -> select genomic only -> IQtree
+- set1.3 -> genomic only -> msatrim internal / ex -> IQtree
+- set 1.4 -> haptophyte only -> IQtree
+- set 1.5 -> haptophyte only full length -> Mafft -> IQtree
+
+  tree annotations
+  - annotate with key residues in alnment
+  - colour clades by phylogenetic group
+
+Questions:
+- Are there orthogroups restricted to particular clades (e.g. calcifying haptophyes)
+- Relationships between clades and key residues
+- evidence of expansion of group? Or emergence of new genes (duplication?)
+- structural modelling of representative sequences for clades = how might properties differ?
+
+Set 2 next steps:
+
+- remove Ehux isoforms
+- remove wierd seqs (e.g. chlamu + others after initial alignment)
+
+- set2.1 all seqs, end trimmed -> mafft -> IQtree
+- set2.2 from 2.1, msatrim internal / external sites-> realign -> IQ tree
+- set2.3 as 2.2, but genomic only -> realign -> IQtree
+- set 2.4 as 2.2 but haptophyte only -> IQtree
+- set 2.5 haptophyte only full length -> mafft -> IQtree
+
+Figures:
+
+Summary trees with collapsed nodes and key annotations
+Protein primary structural diagrams
+Protein 3D structural comparisons
+
+
+
+
+
+
+
