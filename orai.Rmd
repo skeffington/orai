@@ -581,30 +581,29 @@ set1.2gen_meta<-set1.2gen_tree$tip.label %>% as.data.frame() %>% set_colnames(c(
     str_detect(ID, paste(calcify, collapse="|") ) ~ "Calcifying",
   ))
 
-
 #Get residue information from alignment
 
+set1.2aln<-readAAStringSet("set1.2_genomic_aln.fasta", format="fasta") #readd aln
+reference_seq <- as.character(set1.2aln[[2]]) #find human orai1
 
-
-
-set1.2aln<-readAAStringSet("set1.2_genomic_aln.fasta", format="fasta")
-reference_seq <- as.character(set1.2aln[[2]])
 patt_pore <- "Y-*L-*S-*R-*A-*K-*L-*K-*A-*S-*S-*R-*T-*S-*A-*L-*L-*S-*G-*F-*A-*M-*V-*A-*M-*V-*E-*V-*Q-*L-*D-*A-*D-*H-*D-*"
 patt_TM3<-"L-*A-*E-*V-*V-*"
 patt_TM4Pro<-"M-*V-*P-*F-*"
 patt_TM4ex<-"L-*V-*S-*H-*K-*T-*D-*R-*Q-*F-*Q-*E-*L-*N-*E-*L-*A-*E-*F-*A-*R-*L-*Q-*D-*Q-*L-*D-*H-*R-*G-*D-*"
 
+patterns<-c(patt_pore, patt_TM3, patt_TM4Pro, patt_TM4ex)
   
-matches <- gregexpr(pattern, reference_seq, perl = TRUE)[[1]]
-matched_columns <- unlist(lapply(matches, function(m) m:(m + nchar(pattern) - 1)))
-matched_columns <- unique(matched_columns)  # Ensure columns are unique
+regionlist<-list()
+i<-0
+for (p in patterns){
+  i <- i + 1
+  matches <- gregexpr(p, reference_seq, perl = TRUE)[[1]]
+  match_start <- min( unlist(lapply(matches, function(m) m:(m + ((nchar(p) + 2) / 3) - 1))) ) %>% as.double()
+  match_end <- match_start + ( attributes(matches) %>% .$match.length )
+  tm<-c(match_start, match_end)
+  regionlist[[i]]<-tm
+}
 
-    # Trim the alignment to the specific columns
-trimmed_alignment <- AAStringSet(lapply(set1.2aln, function(seq) {
-    substring(seq, min(matched_columns), max(matched_columns))
-}))
-
- paste(substring(set1.2aln[[2]], min(matched_columns), max(matched_columns)), collapse = "")
 
 #Plot tree
 
@@ -615,19 +614,31 @@ t1<-ggtree(set1.2gen_tree) %<+% set1.2gen_meta +
   ggplot2::xlim(0, 14)
 
 
-
 regions<-list(c(233,240),c(520,530))
-
+regionlist
 
 #Add msa
 
-plot_tree_with_msa(t1, "set1.2_genomic_aln.fasta", regions, width=0.4, offset=3, spacing=0.1, bg_line = TRUE)
+plot_tree_with_msa(t1, "set1.2_genomic_aln.fasta", regionlist, width=2, offset=3, spacing=0.05, bg_line = TRUE)
 
 
 
 
 
 ```
+
+
+```{r, fig.width=40, fig.height = 10}
+
+#plot_tree_with_msa(t1, "set1.2_genomic_aln.fasta", regionlist, width=0.05, offset=1, spacing=0.05, bg_line = TRUE)
+
+plot_tree_with_msa(t1, "set1.2_genomic_aln.fasta", regionlist, width=1.3, offset=4, spacing=0.007, bg_line = TRUE, tree_ratio=0.25)
+
+ggtree()
+library(cowplot)
+
+```
+
 ```{}
 #code wastage
 ggmsa("set1.2_genomic_aln.fasta", 233, 237, seq_name = FALSE, char_width = 0.5) + 
@@ -662,8 +673,14 @@ for (i in 1:length(set1.2genclades.df$clade)) {
 }
 
 
-```
+    # Trim the alignment to the specific columns
+trimmed_alignment <- AAStringSet(lapply(set1.2aln, function(seq) {
+    substring(seq, min(matched_columns), max(matched_columns))
+}))
 
+ paste(substring(set1.2aln[[2]], min(matched_columns), max(matched_columns)), collapse = "")
+
+```
 
 
 ```{r}
@@ -696,6 +713,315 @@ categorize_amino_acid <- function(aa) {
     }
     return(NA)  # For any character that doesn't match (shouldn't happen)
 }
+
+# Main function
+plot_tree_with_msa <- function(p, fasta, regions, offset = 0, width = 5, spacing = 0.2, color = NULL, bg_line = TRUE, height = 0.8, tree_ratio = 0.5) {
+    if (missing(fasta)) {
+        x <- NULL
+    } else if (is(fasta, "DNAbin") || is(fasta, "AAbin")) {
+        x <- fasta
+    } else if (is(fasta, "character")) {
+        x <- treeio::read.fasta(fasta)
+    } else {
+        x <- NULL
+    }
+   
+    if (is.null(x) && is(p, "treedata") && length(p@tip_seq)) {
+        x <- p@tip_seq
+        p <- ggtree(p) + geom_tiplab()
+    }
+   
+    if (is.null(x)) {
+        stop("multiple sequence alignment is not available...\n-> check the parameter 'fasta'...")
+    }
+   
+    x <- as.matrix(x)
+   
+    if (!all(labels(x) %in% p$data$label)) {
+        stop("taxa name in input sequences do not match with the ones on the tree, please check your input files...")
+    }
+   
+    if (is.null(regions)) {
+        stop("Please provide a list of regions to display.")
+    }
+   
+    df <- p$data
+    df <- df[df$isTip, ]
+    seqs <- lapply(1:nrow(x), function(i) {
+        seq <- as.vector(as.character(x[i, ]))
+        seq[seq == "?"] <- "-"
+        seq[seq == "*"] <- "-"
+        seq[seq == " "] <- "-"
+        return(seq)
+    })
+    names(seqs) <- labels(x)
+    seqs <- seqs[df$label[order(df$y)]]
+   
+    combined_seqs <- lapply(seqs, function(seq) {
+        combined <- unlist(lapply(regions, function(region) {
+            start <- region[1]
+            end <- region[2]
+            c(seq[start:end], "...")
+        }))
+        combined <- combined[-length(combined)] # Remove last "..."
+        combined <- str_trim(combined)  # Remove trailing white spaces
+        return(combined)
+    })
+   
+    if (is.null(color)) {
+        unique_aa <- unique(unlist(combined_seqs))
+        aa_categories <- sapply(unique_aa, categorize_amino_acid)
+        color <- chem_colors[aa_categories]
+        names(color) <- unique_aa
+        color <- c(color, `-` = "white", `...` = "white")
+    }
+   
+    width_factor <- width * (df$x %>% range %>% diff) / length(combined_seqs[[1]])
+    y <- sort(df$y)
+    h <- ceiling(diff(range(df$y)) / length(df$y))
+    height_factor <- height / 2 * h
+   
+    slice <- seq_along(combined_seqs[[1]])
+    msa_xmax <- offset + seq_along(slice) * (width_factor + spacing)
+    msa_xmin <- msa_xmax - (width_factor + spacing)
+    ymin <- y - height_factor
+    ymax <- y + height_factor
+   
+    msa_df <- do.call("rbind", lapply(1:length(y), function(i) {
+        data.frame(
+            name = names(combined_seqs)[i],
+            xmin = msa_xmin,
+            xmax = msa_xmax,
+            ymin = ymin[i],
+            ymax = ymax[i],
+            seq = combined_seqs[[i]],
+            chem_category = sapply(combined_seqs[[i]], categorize_amino_acid)
+        )
+    }))
+   
+    if (bg_line) {
+        line_segments <- msa_df %>%
+            group_by(ymin) %>%
+            summarize(xmin = min(xmin), xmax = max(xmax), .groups = 'drop')
+        p <- p + geom_segment(data = line_segments, aes(x = xmin, xend = xmax, y = ymin, yend = ymin),
+                              linewidth = h * 0.2, inherit.aes = FALSE)
+    }
+   
+    # Dynamically adjust text size based on MSA width
+    text_size <- min(3, 3 * length(slice) / 50)  # Adjust as needed
+   
+    p_msa <- ggplot(msa_df, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = chem_category)) +
+        geom_rect() +
+        geom_text(aes(x = (xmin + xmax) / 2, y = (ymin + ymax) / 2, label = toupper(seq)),
+                  size = text_size, inherit.aes = FALSE) +
+        scale_fill_manual(values = chem_colors, na.value = "white") +
+        theme_void() +
+        facet_wrap(~ name, ncol = 1, scales = "free_y")
+   
+    combined_plot <- cowplot::plot_grid(
+        p + theme(plot.margin = margin(r = 5)),
+        p_msa + theme(plot.margin = margin(l = 5)),
+        rel_widths = c(tree_ratio, 1 - tree_ratio)
+    )
+   
+    return(combined_plot)
+}
+```
+
+
+
+```{r}
+
+# Define the amino acid chemical categories and corresponding colors
+chem_categories <- list(
+    "nonpolar" = c("A", "V", "L", "I", "M", "F", "W", "P", "G"),
+    "polar" = c("S", "T", "C", "Y", "N", "Q"),
+    "basic" = c("K", "R", "H"),
+    "acidic" = c("D", "E"),
+    "aromatic" = c("F", "W", "Y")
+)
+
+chem_colors <- c(
+    "nonpolar" = "gold",
+    "polar" = "green",
+    "basic" = "blue",
+    "acidic" = "red",
+    "aromatic" = "purple",
+    "-" = "white",  # gap
+    "..." = "white" # gap between regions
+)
+
+# Function to categorize amino acids
+categorize_amino_acid <- function(aa) {
+    aa <- toupper(aa)
+    for (category in names(chem_categories)) {
+        if (aa %in% chem_categories[[category]]) {
+            return(category)
+        }
+    }
+    return(NA)  # For any character that doesn't match (shouldn't happen)
+}
+
+# Main function
+plot_tree_with_msa <- function(p, fasta, regions, offset = 0, width = 5, spacing = 0.2, color = NULL, bg_line = TRUE, height = 0.8, tree_ratio = 0.5, text_size=3) {
+    if (missing(fasta)) {
+        x <- NULL
+    } else if (is(fasta, "DNAbin") || is(fasta, "AAbin")) {
+        x <- fasta
+    } else if (is(fasta, "character")) {
+        x <- treeio::read.fasta(fasta)
+    } else {
+        x <- NULL
+    }
+   
+    if (is.null(x) && is(p, "treedata") && length(p@tip_seq)) {
+        x <- p@tip_seq
+        p <- ggtree(p) + geom_tiplab()
+        
+        # gt = ggplot_gtable(ggplot_build(p))
+        # gtcol<-gt$layout$l[grep('panel', gt$layout$name)] #
+        # gt$widths[gtcol] = tree_ratio*gt$widths[gtcol] # set width to tree_ratio
+        # p<-grid.draw(gt) # plot with grid draw
+    }
+   
+    if (is.null(x)) {
+        stop("multiple sequence alignment is not available...\n-> check the parameter 'fasta'...")
+    }
+   
+    x <- as.matrix(x)
+   
+    if (!all(labels(x) %in% p$data$label)) {
+        stop("taxa name in input sequences do not match with the ones on the tree, please check your input files...")
+    }
+   
+    if (is.null(regions)) {
+        stop("Please provide a list of regions to display.")
+    }
+   
+    df <- p$data
+    df <- df[df$isTip, ]
+    seqs <- lapply(1:nrow(x), function(i) {
+        seq <- as.vector(as.character(x[i, ]))
+        seq[seq == "?"] <- "-"
+        seq[seq == "*"] <- "-"
+        seq[seq == " "] <- "-"
+        return(seq)
+    })
+    names(seqs) <- labels(x)
+    seqs <- seqs[df$label[order(df$y)]]
+   
+    combined_seqs <- lapply(seqs, function(seq) {
+        combined <- unlist(lapply(regions, function(region) {
+            start <- region[1]
+            end <- region[2]
+            c(seq[start:end], "...")
+        }))
+        combined <- combined[-length(combined)] # Remove last "..."
+        combined <- str_trim(combined)  # Remove trailing white spaces
+        return(combined)
+    })
+   
+    if (is.null(color)) {
+        unique_aa <- unique(unlist(combined_seqs))
+        aa_categories <- sapply(unique_aa, categorize_amino_acid)
+        color <- chem_colors[aa_categories]
+        names(color) <- unique_aa
+        color <- c(color, `-` = "white", `...` = "white")
+    }
+   
+    # Compute width factors based on tree_ratio
+    tree_width <- max(df$x) * tree_ratio
+    msa_width <- tree_width / tree_ratio * (1 - tree_ratio)
+   
+    width_factor <- width * (df$x %>% range %>% diff) / length(combined_seqs[[1]])
+    y <- sort(df$y)
+    h <- ceiling(diff(range(df$y)) / length(df$y))
+    height_factor <- height / 2 * h
+   
+    slice <- seq_along(combined_seqs[[1]])
+    xmax <- tree_width + offset + seq_along(slice) * (width_factor + spacing)
+    xmin <- xmax - (width_factor + spacing)
+    ymin <- y - height_factor
+    ymax <- y + height_factor
+   
+    msa_df <- do.call("rbind", lapply(1:length(y), function(i) {
+        data.frame(
+            name = names(combined_seqs)[i],
+            xmin = xmin,
+            xmax = xmax,
+            ymin = ymin[i],
+            ymax = ymax[i],
+            seq = combined_seqs[[i]],
+            chem_category = sapply(combined_seqs[[i]], categorize_amino_acid)
+        )
+    }))
+   
+    if (bg_line) {
+        line_segments <- msa_df %>%
+            group_by(ymin) %>%
+            summarize(xmin = min(xmin), xmax = max(xmax), .groups = 'drop')
+        p <- p + geom_segment(data = line_segments, aes(x = xmin, xend = xmax, y = ymin, yend = ymin),
+                              linewidth = h * 0.2, inherit.aes = FALSE)
+    }
+   
+    # Dynamically adjust text size based on MSA width
+    #text_size <-3 #min(3, 3 * msa_width / 10)  # Adjust as needed
+   
+    p <- p +
+        geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = chem_category),
+                  data = msa_df, inherit.aes = FALSE) +
+        geom_text(aes(x = (xmin + xmax) / 2, y = (ymin + ymax) / 2, label = toupper(seq)),
+                  data = msa_df, inherit.aes = FALSE, size = text_size) +
+        scale_fill_manual(values = chem_colors, na.value = "white")
+    browser()
+        gt = ggplot_gtable(ggplot_build(p))
+        gtcol<-gt$layout$l[grep('panel', gt$layout$name)] #
+        gt$widths[gtcol] = tree_ratio*gt$widths[gtcol] # set width to tree_ratio
+        p<-grid.draw(gt) # plot with grid draw
+    
+    return(p)
+}
+
+```
+
+```{r}
+library(gtable)
+library(grid)
+```
+
+
+```{r}
+# Define the amino acid chemical categories and corresponding colors
+chem_categories <- list(
+    "nonpolar" = c("A", "V", "L", "I", "M", "F", "W", "P", "G"),
+    "polar" = c("S", "T", "C", "Y", "N", "Q"),
+    "basic" = c("K", "R", "H"),
+    "acidic" = c("D", "E"),
+    "aromatic" = c("F", "W", "Y")
+)
+
+chem_colors <- c(
+    "nonpolar" = "gold",
+    "polar" = "green",
+    "basic" = "blue",
+    "acidic" = "red",
+    "aromatic" = "purple",
+    "-" = "white",  # gap
+    "..." = "white" # gap between regions
+)
+
+# Function to categorize amino acids
+categorize_amino_acid <- function(aa) {
+    aa <- toupper(aa)
+    for (category in names(chem_categories)) {
+        if (aa %in% chem_categories[[category]]) {
+            return(category)
+        }
+    }
+    return(NA)  # For any character that doesn't match (shouldn't happen)
+}
+
+
 
 # Main function
 plot_tree_with_msa <- function(p, fasta, regions, offset = 0, width = 5, spacing = 0.2, color = NULL, bg_line = TRUE, height = 0.8) {
@@ -750,6 +1076,7 @@ plot_tree_with_msa <- function(p, fasta, regions, offset = 0, width = 5, spacing
         combined <- str_trim(combined)  # Remove trailing white spaces
         return(combined)
     })
+    browser()
    
     if (is.null(color)) {
         unique_aa <- unique(unlist(combined_seqs))
