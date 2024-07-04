@@ -7,10 +7,14 @@ output: html_notebook
 library(tidyverse)
 library(magrittr)
 library(data.table)
-library(msa)
-library(ggmsa)
+library(ggtree)
+#library(msa)
+
 library(DECIPHER)
-library(microseq)
+#library(microseq)
+library(ape)
+library(plotly)
+library(ggmsa)
 ```
 
 Key links for phylogeny:
@@ -65,7 +69,9 @@ Haptophyte sequences from across Danijela's tree
 ```{r}
 
 orai_sel<-readAAStringSet("orai_select.fasta")
+```
 
+```{#r}
 orai_sel_aln<-msa(orai_sel, method="Muscle")
 print(orai_sel_aln, show="complete")
 
@@ -76,8 +82,6 @@ msaPrettyPrint(orai_sel_aln, y=c(164, 213), output="asis", showNames="left", sho
 ggmsa(orai_sel, 300, 350, color = "Clustal", font = "DroidSansMono", char_width = 0.5, seq_name = TRUE )
 
 p <- ggmsa(protein_sequences, 300, 350, char_width = 0.5, seq_name = TRUE) + geom_msaBar()
-
-
 ggsave("p.png",p, height = 2,width = 8)
 ```
 
@@ -166,8 +170,7 @@ for i in *.fasta; do NAME=$(basename $i .fasta)_DB; OUT=$(basename $i .fasta)_FL
 
 Download from Interpro fasta files of :
 
->
-> 
+
 
 And create profiles with mmseqs
 
@@ -255,9 +258,14 @@ OraiSFpro %>% filter(V11 < 10^-20 & V3 > 0.7) %>% nrow()
 c(PFhits$V1, TMpsi$V2, FLpsi$V2, OraiSFpro$V2, cracFpro$V2) %>% as.character() %>% unique() %>% length()
 
 selectedids<-c(PFhits$V1, TMpsi$V2, FLpsi$V2, OraiSFpro$V2, cracFpro$V2) %>% as.character() %>% unique() 
+```
 
+```{#r}
 #write ID list
-write.table(selectedids, file="/data2/orai/proteomes/selectedprot_ids.txt", sep = "\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
+write.table(selectedids, file="/data2/orai/putative/selectedprot_ids.txt", sep = "\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
+
+#Make ID list namining consistent with fasta file:
+#sed -i -r 's/(A0A.*)/\1_Coccolithus_braarudii/g' selectedprot_ids.txt
 
 ```
 
@@ -266,9 +274,12 @@ Extract sequences to fasta with seqkit grep. Fasta file in
 /data2/orai/putative/putative_orai.fasta
 
 ```{}
-sed -i 's/*//g' putative_orai.fasta
-sed -r 's/>([^ ]*) .*$/>\1/g' putative_orai.fasta > putative_orai_sn.fasta
 
+#cat all proteomes together
+sed 's/ /_/g' sturm_braarudii_orai.fasta | sed -E 's/\[|\]//g' > sturm_braarudii_orai_sn.fasta
+cat ../sturm_braarudii_orai_sn.fasta All_chosen_proteomes.fasta > All_project_proteins.fasta
+
+seqkit grep -f selectedprot_ids.txt All_project_proteins.fasta | sed 's/*//g' | sed -r 's/>([^ ]*) .*$/>\1/g' > putative_orai.fasta 
 
 ./interproscan.sh -cpu 28 -i /data2/orai/putative/putative_orai_sn.fasta -f tsv -o orai_interpro.tsv
 
@@ -295,6 +306,78 @@ Orai_initial<-Orai_initial %>% mutate(., IP_CRAC= Orai_initial$ID %in% orai_IP_c
 
 Orai_initial<-Orai_initial %>% mutate(., IP_ORAI= Orai_initial$ID %in% orai_IP_oraiSF$V1)
 
+Orai_initial<-Orai_initial %>% mutate(., genomic = case_when(
+                         str_detect(ID, "^EhG") == TRUE ~ TRUE,
+                         str_detect(ID, "^Br") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00006") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00024") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00046") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00134") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00136") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00144") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00185") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00198") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00202") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00224") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00314") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00323") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00480") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00530") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00582") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00682") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00770") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00797") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00822") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00900") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00934") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00962") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00963") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00964") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00965") == TRUE ~ TRUE,
+                         str_detect(ID, "^EP00966") == TRUE ~ TRUE,
+                          str_detect(ID, "^EP00967") == TRUE ~ TRUE,
+                          str_detect(ID, "^EP00977") == TRUE ~ TRUE,
+                          str_detect(ID, "^EP01082") == TRUE ~ TRUE,
+                          str_detect(ID, "^Phaglo1") == TRUE ~ TRUE,
+                         .default = FALSE
+                         ))
+
+Orai_initial<-Orai_initial %>% mutate(., hapista = case_when(
+                         str_detect(ID, "^EP00006") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00024") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00046") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00134") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00136") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00144") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00163") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00185") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00198") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00202") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00224") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00298") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00425") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00427") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00428") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00429") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00480") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00530") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00582") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00656") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00682") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00696") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00697") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00770") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00979") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00822") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00829") == TRUE ~ FALSE,
+                         str_detect(ID, "^EP00934") == TRUE ~ FALSE,
+                          str_detect(ID, "^EP00977") == TRUE ~ FALSE,
+                          str_detect(ID, "^EP001082") == TRUE ~ FALSE,
+                         .default = TRUE))
+
+#remove unreasonably long chlamy prot (there is still another)
+Orai_initial<-Orai_initial %>% filter(., ! ID == "EP00198_Chlamydomonas_reinhardtii_P008565")
+
 
 ```
 
@@ -315,58 +398,459 @@ Orai_initial_noIP %>% filter(., ! is.na(crac_fam_prof_search_minPval) | ! is.na(
 #So there are some reasonable candidates not identified by interpro as Orai SF. 
 #Full length psi searches finds a lot of additional candidates compared to transmembrane psi searches
 #there are a number of proteins where the only evidence is a weak full length psi hit. Or with only weak pfam hit
+```
 
+```{#r}
 #Define 2 protein sets:
 
-# Interpro Orai only: 152 proteins (incluing Ehux isoforms)
+#set1: Interpro Orai only: 152 proteins (incluing Ehux isoforms)
 
 Orai_initial_IPORAI<-Orai_initial %>% filter(., IP_ORAI ==TRUE) 
-Orai_set1<-Orai_initial %>% filter(., IP_ORAI ==TRUE) %>% .$ID
+Orai_set1<-Orai_initial %>% filter(., IP_ORAI ==TRUE) %>% filter(., ! ID %in% ehuxisos)  %>% .$ID
 write.table(Orai_set1, file="/data2/orai/putative/Orai_set1prot_ids.txt", sep = "\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
 
+#set1 genomic:
 
-# Interpro Orai or found in CRAC fam profile search or found in TM psi search #250
+ehuxisos<-c("EhG16802.2","EhG16802.3","EhG16802.4","EhG28556.4","EhG40991.4","EhG26343.2")
 
-Orai_set2<-Orai_initial %>% filter(., IP_ORAI ==TRUE | ! is.na(crac_fam_prof_search_minPval) | !is.na(true_orai_transmem_psi_search_minPval) ) %>% .$ID
+Orai_set1_genomic<-Orai_initial %>% filter(., IP_ORAI ==TRUE) %>% filter(., genomic == TRUE) %>% filter(., ! ID %in% ehuxisos) %>%  .$ID
+write.table(Orai_set1_genomic, file="/data2/orai/putative/Orai_set1_genomic_ids.txt", sep = "\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
+
+#set 1 haptophyte:
+
+Orai_set1_hapto<-Orai_initial %>% filter(., IP_ORAI ==TRUE) %>% filter(., hapista == TRUE) %>% filter(., ! ID %in% ehuxisos) %>%  .$ID
+write.table(Orai_set1_hapto, file="/data2/orai/putative/Orai_set1_hapista_ids.txt", sep = "\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
+
+#Set2 Interpro Orai or found in CRAC fam profile search or found in TM psi search #250
+
+Orai_set2<-Orai_initial %>% filter(., IP_ORAI ==TRUE | ! is.na(crac_fam_prof_search_minPval) | !is.na(true_orai_transmem_psi_search_minPval) ) %>% filter(., ! ID %in% ehuxisos)  %>% .$ID
 
 write.table(Orai_set2, file="/data2/orai/putative/Orai_set2prot_ids.txt", sep = "\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
 
+#Set2 genomic
+
+Orai_set2_genomic<-Orai_initial %>%  filter(., IP_ORAI ==TRUE | ! is.na(crac_fam_prof_search_minPval) | !is.na(true_orai_transmem_psi_search_minPval) )%>% filter(., genomic == TRUE) %>% filter(., ! ID %in% ehuxisos) %>%  .$ID
+write.table(Orai_set2_genomic, file="/data2/orai/putative/Orai_set2_genomic_ids.txt", sep = "\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
+
+#Set2 hapista
+
+Orai_set2_hapto<-Orai_initial %>%  filter(., IP_ORAI ==TRUE | ! is.na(crac_fam_prof_search_minPval) | !is.na(true_orai_transmem_psi_search_minPval) ) %>% filter(., hapista == TRUE) %>% filter(., ! ID %in% ehuxisos) %>%  .$ID
+write.table(Orai_set2_hapto, file="/data2/orai/putative/Orai_set2_hapista_ids.txt", sep = "\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
+
+# Note: extract to fasta, then add the relevant additional seqs (human etc before doing alignments)
+
 ```
 
-Extract IDs and add in known Orais then make alignments in MAFFT
+
+
+```{}
+
+#On all ID lists run:
+
+for i in Orai*ids.txt; do sed -i -r 's/(A0A.*)/\1_Coccolithus_braarudii/g' $i; done
+ #make consistent with fast input
+
+seqkit grep -f Orai_set1prot_ids.txt All_project_proteins.fasta | sed -r 's/>([^ ]*) .*$/>\1/g' | sed 's/*//g'  > set1_initial.fasta
+cat set1_initial.fasta known_orai.fasta > set1.fasta
+
+seqkit grep -f Orai_set2prot_ids.txt All_project_proteins.fasta | sed -r 's/>([^ ]*) .*$/>\1/g' | sed 's/*//g'  > set2_initial.fasta
+cat set2_initial.fasta known_orai.fasta > set2.fasta
+##
+seqkit grep -f Orai_set1_genomic_ids.txt All_project_proteins.fasta | sed -r 's/>([^ ]*) .*$/>\1/g' | sed 's/*//g'  > set1_genomic.fasta
+cat set1_genomic.fasta known_orai.fasta > set1.2genomic.fasta
+
+seqkit grep -f Orai_set2_genomic_ids.txt All_project_proteins.fasta | sed -r 's/>([^ ]*) .*$/>\1/g' | sed 's/*//g'  > set2_genomic.fasta
+cat set2_genomic.fasta known_orai.fasta > set2.2_genomic.fasta
+
+seqkit grep -f Orai_set1_hapista_ids.txt All_project_proteins.fasta | sed -r 's/>([^ ]*) .*$/>\1/g' | sed 's/*//g'  > set1_hapista.fasta
+cat set1_hapista.fasta known_orai.fasta > set1.3_hapista.fasta
+
+seqkit grep -f Orai_set2_hapista_ids.txt All_project_proteins.fasta | sed -r 's/>([^ ]*) .*$/>\1/g' | sed 's/*//g'  > set2_hapista.fasta
+cat set2_hapista.fasta known_orai.fasta > set2.3_hapista.fasta
+
+```
+
+
+Do initial alignment with MAFFT-dash and trim central region using Jalview.
+From LSWRKLY ... QELNELA in the human sequences. Limits of near universal homology
+
+yields ```set1.0_aln.fasta```
+
+Don't realign wth mafft - makes alignment worse.
+
+
+# Trees
+
+Make annotation data
+
+```{r}
+
+prymnesiales<-c("EP00322_","EP00323_","EP00324_","EP00325_","EP00326_","EP00327_","EP00900_","EP00966_")
+isochrysidales<-c("EhG.*\\.","Br.*\\.t1","EP00312_","EP00314_","EP00315_","EP00962_","EP00967_")
+coccolithales<-c("EP00308_","EP00310_","EP00965_","s_braarudii")
+syracosphaerales<-c("EP00316_")
+zycodiscales<-c()#"EP00316_",
+pavlovales<-c("EP00302_","EP00303_","EP00304_","EP00306_","EP00307_","EP00963_")
+phaeocystales<-c("EP00320_","EP00908_","EP00964_","Phaglo1")
+ancoracysta<-c("EP00164_")
+centroplasthelida<-c("EP00298_","EP00299_","EP00300_","EP00301_")
+diatoms<-c("EP00530_","EP00582_","EP00797_","EP00934_","EP00977_","EP01082_","_THAPS")
+alveolata<-c("EP00425_","EP00427_","EP00428_","EP00429_","EP00822_","EP00829_") #dinos, cilliophora, plasmodium
+foraminifera<-c("EP00480_") #rhizaria / SAR
+archaeplastida<-c("EP00185_","EP00198_","EP00202_","EP00224_","_CHLRE","_PHYPA")
+telonema<-c("EP00656_")
+hemimastigophora<-c("EP00696_","EP00697_")
+discoba<-c("EP00682_")
+metamonida<-c("EP00770_")
+ameobozoa<-c("EP00006_","EP00024_")
+obozoa<-c("EP00046_","EP00134_","EP00136_","EP00144_")
+Ancyromonadida<-c("EP00163_")
+
+haptophytes<-c(prymnesiales, isochrysidales, coccolithales, syracosphaerales, pavlovales, phaeocystales)
+hapista<-c(ancoracysta, centroplasthelida, haptophytes)
+calcify<-c(coccolithales, syracosphaerales, "EhG.*\\.","Br.*\\.t1", "EP00314_","EP00315_")
+
+
+```
+
+basic. R91 mutation causes disease and disrupts
+SRAKLKASSRT 
+hydrophobic
+LLSGFAMV
+selectivity: MVEV
+DADHD: calcium accumulating region, ensure ca influx even in low Ca conditions
+
+whole region:
+YLSRAKLKASSRTSALLSGFAMVAMVEVQLDADHD
+
+Internal repeat homology - E106 equiv in TM3. E190
+LAEVV
+
+P245: TM4 bend, critical for conforomaional rearrangements
+MVPF
+
+TM4ex: antiparallel associaton between neigboring subunits and STIM1 coupling and ABP action. LVSHKT is nexus before TM4x
+LVSHKTDRQFQELNELAEFARLQDQLDHRGD
+
+STIM binding site in c terminus:
+SLVSHKTDRQFQELNE
+
+Li 2021
+    • Constitutively active mutants: dOrai-H206A , dOrai-P288L
+    • hOrai1-F257 in TM4, hOrai1-L261 in TM4 and hOrai1-F178A in TM3 (corresponding to F300, L304 and F250 in the dOrai channel, respectively), that interfere with the intra-subunit interactions between the TM3 and TM4 helices, cause a decrease in Ca2+ influx without attenuating the association of STIM1 with hOrai1
+    • L81A, E173A and H169A mutants of hOrai1 obviously attenuate or abolish extracellular Ca2+ influx
+    • mutations, such as R83A-K87A and R77A-K78A in the constitutively mutant hOrai1-P245L [39] and R155S/K159S/K163S in the open state dOrai-H206A [38], were introduced in the positively charged basic region to prevent electrostatic repulsion; these mutations greatly attenuate the influx of extracellular Ca2+. These results indicated that the basic region near the cytosolic face of the pore may play some unexpected but important roles in Ca2+ permeation.
+
+```{r}
+
+#read tree
+set1.2gen_tree<-read.tree("set1.2_genomic_tree.nwk")
+
+#use plotly to identify root node and reset
+## plotly::ggplotly(p2)
+
+set1.2gen_tree<-root(set1.2gen_tree, node=53) 
+
+# make metadata dataframe for this set of sequences
+set1.2gen_meta<-set1.2gen_tree$tip.label %>% as.data.frame() %>% set_colnames(c("ID")) %>%
+  mutate(., group = case_when(
+    str_detect(ID, paste(prymnesiales, collapse="|") ) ~ "Prymnesiales",
+    str_detect(ID, paste(isochrysidales, collapse="|") ) ~ "Isochrysidales",
+    str_detect(ID, paste(coccolithales, collapse="|") ) ~ "Coccolithales",
+    str_detect(ID, paste(syracosphaerales, collapse="|") ) ~ "syracosphaerales",
+    str_detect(ID, paste(pavlovales, collapse="|") ) ~ "Pavlovales",
+    str_detect(ID, paste(phaeocystales, collapse="|") ) ~ "Phaeocystales",
+    str_detect(ID, paste(ancoracysta, collapse="|") ) ~ "Ancoracysta",
+    str_detect(ID, paste(centroplasthelida, collapse="|") ) ~ "Centroplasthelida",
+    str_detect(ID, paste(diatoms, collapse="|") ) ~ "Diatoms",
+    str_detect(ID, paste(alveolata, collapse="|") ) ~ "Alveolata",
+    str_detect(ID, paste(foraminifera, collapse="|") ) ~ "Foraminifera",
+    str_detect(ID, paste(archaeplastida, collapse="|") ) ~ "Archaeplastida",
+    str_detect(ID, paste(telonema, collapse="|") ) ~ "Telonema",
+    str_detect(ID, paste(hemimastigophora , collapse="|") ) ~ "Hemimastigophora",
+    str_detect(ID, paste(discoba, collapse="|") ) ~ "Discoba",
+    str_detect(ID, paste(metamonida, collapse="|") ) ~ "Metamonida",
+    str_detect(ID, paste(ameobozoa, collapse="|") ) ~ "Ameobozoa",
+    str_detect(ID, paste(obozoa, collapse="|") ) ~ "Obozoa",
+    str_detect(ID, paste(Ancyromonadida, collapse="|") ) ~ "Ancyromonadida",
+    .default = "Obozoa"  )) %>%
+  mutate(., haptista = case_when(
+    str_detect(ID, paste(hapista, collapse="|") ) ~ "Hapista",
+  )) %>%
+  mutate(., calcifier = case_when(
+    str_detect(ID, paste(calcify, collapse="|") ) ~ "Calcifying",
+  ))
+
+
+#Get residue information from alignment
+
+
+
+
+set1.2aln<-readAAStringSet("set1.2_genomic_aln.fasta", format="fasta")
+reference_seq <- as.character(set1.2aln[[2]])
+patt_pore <- "Y-*L-*S-*R-*A-*K-*L-*K-*A-*S-*S-*R-*T-*S-*A-*L-*L-*S-*G-*F-*A-*M-*V-*A-*M-*V-*E-*V-*Q-*L-*D-*A-*D-*H-*D-*"
+patt_TM3<-"L-*A-*E-*V-*V-*"
+patt_TM4Pro<-"M-*V-*P-*F-*"
+patt_TM4ex<-"L-*V-*S-*H-*K-*T-*D-*R-*Q-*F-*Q-*E-*L-*N-*E-*L-*A-*E-*F-*A-*R-*L-*Q-*D-*Q-*L-*D-*H-*R-*G-*D-*"
+
+  
+matches <- gregexpr(pattern, reference_seq, perl = TRUE)[[1]]
+matched_columns <- unlist(lapply(matches, function(m) m:(m + nchar(pattern) - 1)))
+matched_columns <- unique(matched_columns)  # Ensure columns are unique
+
+    # Trim the alignment to the specific columns
+trimmed_alignment <- AAStringSet(lapply(set1.2aln, function(seq) {
+    substring(seq, min(matched_columns), max(matched_columns))
+}))
+
+ paste(substring(set1.2aln[[2]], min(matched_columns), max(matched_columns)), collapse = "")
+
+#Plot tree
+
+t1<-ggtree(set1.2gen_tree) %<+% set1.2gen_meta +
+  geom_tippoint(aes(color=group), size=1.5) +
+  geom_tiplab(aes(colour=group), size=2, nudge_x = 0.2, align=TRUE ) + 
+  geom_nodelab(aes(label=label), hjust=-.05, size=2.0)  + 
+  ggplot2::xlim(0, 14)
+
+
+
+regions<-list(c(233,240),c(520,530))
+
+
+#Add msa
+
+plot_tree_with_msa(t1, "set1.2_genomic_aln.fasta", regions, width=0.4, offset=3, spacing=0.1, bg_line = TRUE)
+
+
+
+
+
+```
+```{}
+#code wastage
+ggmsa("set1.2_genomic_aln.fasta", 233, 237, seq_name = FALSE, char_width = 0.5) + 
+  geom_seqlogo(color = "Chemistry_AA")
+msaplot(t1, "set1.2_genomic_aln.fasta", window=c(233,237), width=0.2, offset=5, bg_line = TRUE)
+
+plot_tree_with_msa(t1, "set1.2_genomic_aln.fasta", window=c(233,237), width=0.2, offset=5, bg_line = TRUE)
+
+ggtree(set1.2gen_tree) %<+% set1.2gen_meta +
+  geom_highlight(data=set1.2genclades.df, 
+                 aes(node=node, fill=clade),
+                 alpha=1,
+                 align="right",
+                 extend=0.1,
+                 show.legend=TRUE) +
+  geom_tiplab(size=2) + 
+  geom_nodelab(aes(label=label), hjust=-.05, size=3.5)  + 
+  ggplot2::xlim(0, 14) +
+  geom_rootedge() 
+#Make dataframe for clade nodes
+set1.2genclades.df <- data.frame(
+  clade=unique(set1.2gen_meta$group),
+  node=NA
+)
+#Find the most recent common ancestor for each clade
+for (i in 1:length(set1.2genclades.df$clade)) {
+  
+  set1.2genclades.df$node[i] <- MRCA(
+    set1.2gen_tree,
+    set1.2gen_meta$ID[set1.2gen_meta$group == set1.2genclades.df$clade[i]]
+    )
+}
+
+
+```
+
+
+
+```{r}
+# Define the amino acid chemical categories and corresponding colors
+chem_categories <- list(
+    "nonpolar" = c("A", "V", "L", "I", "M", "F", "W", "P", "G"),
+    "polar" = c("S", "T", "C", "Y", "N", "Q"),
+    "basic" = c("K", "R", "H"),
+    "acidic" = c("D", "E"),
+    "aromatic" = c("F", "W", "Y")
+)
+
+chem_colors <- c(
+    "nonpolar" = "gold",
+    "polar" = "green",
+    "basic" = "blue",
+    "acidic" = "red",
+    "aromatic" = "purple",
+    "-" = "white",  # gap
+    "..." = "white" # gap between regions
+)
+
+# Function to categorize amino acids
+categorize_amino_acid <- function(aa) {
+    aa <- toupper(aa)
+    for (category in names(chem_categories)) {
+        if (aa %in% chem_categories[[category]]) {
+            return(category)
+        }
+    }
+    return(NA)  # For any character that doesn't match (shouldn't happen)
+}
+
+# Main function
+plot_tree_with_msa <- function(p, fasta, regions, offset = 0, width = 5, spacing = 0.2, color = NULL, bg_line = TRUE, height = 0.8) {
+    if (missing(fasta)) {
+        x <- NULL
+    } else if (is(fasta, "DNAbin") || is(fasta, "AAbin")) {
+        x <- fasta
+    } else if (is(fasta, "character")) {
+        x <- treeio::read.fasta(fasta)
+    } else {
+        x <- NULL
+    }
+   
+    if (is.null(x) && is(p, "treedata") && length(p@tip_seq)) {
+        x <- p@tip_seq
+        p <- ggtree(p) + geom_tiplab()
+    }
+   
+    if (is.null(x)) {
+        stop("multiple sequence alignment is not available...\n-> check the parameter 'fasta'...")
+    }
+   
+    x <- as.matrix(x)
+   
+    if (!all(labels(x) %in% p$data$label)) {
+        stop("taxa name in input sequences do not match with the ones on the tree, please check your input files...")
+    }
+   
+    if (is.null(regions)) {
+        stop("Please provide a list of regions to display.")
+    }
+   
+    df <- p$data
+    df <- df[df$isTip, ]
+    seqs <- lapply(1:nrow(x), function(i) {
+        seq <- as.vector(as.character(x[i, ]))
+        seq[seq == "?"] <- "-"
+        seq[seq == "*"] <- "-"
+        seq[seq == " "] <- "-"
+        return(seq)
+    })
+    names(seqs) <- labels(x)
+    seqs <- seqs[df$label[order(df$y)]]
+   
+    combined_seqs <- lapply(seqs, function(seq) {
+        combined <- unlist(lapply(regions, function(region) {
+            start <- region[1]
+            end <- region[2]
+            c(seq[start:end], "...")
+        }))
+        combined <- combined[-length(combined)] # Remove last "..."
+        combined <- str_trim(combined)  # Remove trailing white spaces
+        return(combined)
+    })
+   
+    if (is.null(color)) {
+        unique_aa <- unique(unlist(combined_seqs))
+        aa_categories <- sapply(unique_aa, categorize_amino_acid)
+        color <- chem_colors[aa_categories]
+        names(color) <- unique_aa
+        color <- c(color, `-` = "white", `...` = "white")
+    }
+   
+    width_factor <- width * (df$x %>% range %>% diff) / length(combined_seqs[[1]])
+    y <- sort(df$y)
+    h <- ceiling(diff(range(df$y)) / length(df$y))
+    height_factor <- height / 2 * h
+   
+    slice <- seq_along(combined_seqs[[1]])
+    xmax <- max(df$x) * 1.02 + offset + seq_along(slice) * (width_factor + spacing)
+    xmin <- xmax - (width_factor + spacing)
+    ymin <- y - height_factor
+    ymax <- y + height_factor
+   
+    msa_df <- do.call("rbind", lapply(1:length(y), function(i) {
+        data.frame(
+            name = names(combined_seqs)[i],
+            xmin = xmin,
+            xmax = xmax,
+            ymin = ymin[i],
+            ymax = ymax[i],
+            seq = combined_seqs[[i]],
+            chem_category = sapply(combined_seqs[[i]], categorize_amino_acid)
+        )
+    }))
+   
+    if (bg_line) {
+        line_segments <- msa_df %>%
+            group_by(ymin) %>%
+            summarize(xmin = min(xmin), xmax = max(xmax), .groups = 'drop')
+        p <- p + geom_segment(data = line_segments, aes(x = xmin, xend = xmax, y = ymin, yend = ymin),
+                              linewidth = h * 0.2, inherit.aes = FALSE)
+    }
+   
+    p <- p +
+        geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = chem_category),
+                  data = msa_df, inherit.aes = FALSE) +
+        geom_text(aes(x = (xmin + xmax) / 2, y = (ymin + ymax) / 2, label = toupper(seq)),
+                  data = msa_df, inherit.aes = FALSE, size = 3) +
+        scale_fill_manual(values = chem_colors, na.value = "white")
+   
+    return(p)
+}
+```
+
+
+
+```{r}
+# CREATE A TREE -------------------------------------------------------------
+n_samples <- 20
+n_grp <- 4
+tree <- ape::rtree(n = n_samples)
+
+# CREATE SOME METADATA ----------------------------------------------------
+id <- tree$tip.label
+set.seed(42)
+grp <- sample(LETTERS[1:n_grp], size = n_samples, replace = T)
+dat <- tibble::tibble(id = id,
+                      grp = grp)
+
+# PLOT THE TREE -----------------------------------------------------------
+p1 <- ggtree(tree)
+
+metat <- p1$data %>%
+  dplyr::inner_join(dat, c('label' = 'id'))
+
+p2 <- p1 +
+  geom_point(data = metat,
+             aes(x = x,
+                 y = y,
+                 colour = grp,
+                 label = id))
+
+plotly::ggplotly(p2)
+```
+
 
 # Set1
 
 Do initial MAFT / dash alignment
 Identify main TM region: 557-1262
 
-```{}
 
-#download: set1_initial_aln.fasta
-# Get main region
 
-seqkit subseq -r 557:1262 set1_initial_aln.fasta > set1_initial_aln_trim.fasta
-
-#remove aln positions:
-
-sed -r 's/-//g' set1_initial_aln_trim.fasta | seqtk seq > set1_initial_aln_trim_tidy.fasta
-
-remove EP00198 chlamy sequence (very long)
-
-Now align again with MAFT webserver: set1_trimmed_aln.fasta
-
-Make tree with IQtree
-```
 
 
 Set 1 next steps
 
 - check and remove Ehux isoforms
-- set1.1 -> msatrim internal and external sites -> IQtree
-- set1.2 -> select genomic only -> IQtree
-- set1.3 -> genomic only -> msatrim internal / ex -> IQtree
-- set 1.4 -> haptophyte only -> IQtree
-- set 1.5 -> haptophyte only full length -> Mafft -> IQtree
+- set1.0 -> manual end trim  -> IQtree
+
+- set1.2 -> select genomic only -> aln -> manual end trim -> IQtree
+- set 1.3 -> haptophyte only -> aln -> manual end trim -> IQtree
+
+- set 1.3 -> haptophyte only full length -> aln -> manual end trim  -> IQtree
 
   tree annotations
   - annotate with key residues in alnment
@@ -383,10 +867,9 @@ Set 2 next steps:
 - remove Ehux isoforms
 - remove wierd seqs (e.g. chlamu + others after initial alignment)
 
-- set2.1 all seqs, end trimmed -> mafft -> IQtree
-- set2.2 from 2.1, msatrim internal / external sites-> realign -> IQ tree
-- set2.3 as 2.2, but genomic only -> realign -> IQtree
-- set 2.4 as 2.2 but haptophyte only -> IQtree
+- set2.0 all seqs, end trimmed -> mafft -> IQtree
+- set2.2 genomic only -> aln -> IQtree
+- set 2.3 haptophyte only -> aln -> IQtree
 - set 2.5 haptophyte only full length -> mafft -> IQtree
 
 Figures:
@@ -398,6 +881,18 @@ Protein 3D structural comparisons
 
 
 
+```{}
+NOT USEd
+#download: set1_initial_aln.fasta
+# Get main region
+
+seqkit subseq -r 557:1262 set1_initial_aln.fasta > set1_initial_aln_trim.fasta
+
+#remove aln positions:
+sed -r 's/-//g' set1_initial_aln_trim.fasta | seqtk seq > set1_initial_aln_trim_tidy.fasta
+
+
+```
 
 
 
