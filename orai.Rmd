@@ -9,12 +9,16 @@ library(magrittr)
 library(data.table)
 library(ggtree)
 #library(msa)
-
 library(DECIPHER)
 #library(microseq)
 library(ape)
 library(plotly)
 library(ggmsa)
+library(ggtreeExtra)
+library(ggnewscale)
+library(cowplot)
+library(svglite)
+library(viridis)
 ```
 
 Key links for phylogeny:
@@ -541,6 +545,13 @@ Li 2021
     • L81A, E173A and H169A mutants of hOrai1 obviously attenuate or abolish extracellular Ca2+ influx
     • mutations, such as R83A-K87A and R77A-K78A in the constitutively mutant hOrai1-P245L [39] and R155S/K159S/K163S in the open state dOrai-H206A [38], were introduced in the positively charged basic region to prevent electrostatic repulsion; these mutations greatly attenuate the influx of extracellular Ca2+. These results indicated that the basic region near the cytosolic face of the pore may play some unexpected but important roles in Ca2+ permeation.
 
+
+
+In tree file, pipes have been converted to underscores. need to do same to the aln.fasta files.
+```for i in set*aln*; do sed -r -i 's/\|/_/g' $i; done```
+
+## set1.2 genomic
+
 ```{r}
 
 #read tree
@@ -604,84 +615,328 @@ for (p in patterns){
   regionlist[[i]]<-tm
 }
 
+```
+
+
+
+```{r, fig.width=40, fig.height = 10}
+
 
 #Plot tree
 
 t1<-ggtree(set1.2gen_tree) %<+% set1.2gen_meta +
   geom_tippoint(aes(color=group), size=1.5) +
-  geom_tiplab(aes(colour=group), size=2, nudge_x = 0.2, align=TRUE ) + 
-  geom_nodelab(aes(label=label), hjust=-.05, size=2.0)  + 
-  ggplot2::xlim(0, 14)
-
-
-regions<-list(c(233,240),c(520,530))
-regionlist
-
-#Add msa
-
-plot_tree_with_msa(t1, "set1.2_genomic_aln.fasta", regionlist, width=2, offset=3, spacing=0.05, bg_line = TRUE)
-
-
-
-
-
-```
-
-
-```{r, fig.width=40, fig.height = 10}
-
-#plot_tree_with_msa(t1, "set1.2_genomic_aln.fasta", regionlist, width=0.05, offset=1, spacing=0.05, bg_line = TRUE)
-
-plot_tree_with_msa(t1, "set1.2_genomic_aln.fasta", regionlist, width=1.3, offset=4, spacing=0.007, bg_line = TRUE, tree_ratio=0.25)
-
-ggtree()
-library(cowplot)
-
-```
-
-```{}
-#code wastage
-ggmsa("set1.2_genomic_aln.fasta", 233, 237, seq_name = FALSE, char_width = 0.5) + 
-  geom_seqlogo(color = "Chemistry_AA")
-msaplot(t1, "set1.2_genomic_aln.fasta", window=c(233,237), width=0.2, offset=5, bg_line = TRUE)
-
-plot_tree_with_msa(t1, "set1.2_genomic_aln.fasta", window=c(233,237), width=0.2, offset=5, bg_line = TRUE)
-
-ggtree(set1.2gen_tree) %<+% set1.2gen_meta +
-  geom_highlight(data=set1.2genclades.df, 
-                 aes(node=node, fill=clade),
-                 alpha=1,
-                 align="right",
-                 extend=0.1,
-                 show.legend=TRUE) +
-  geom_tiplab(size=2) + 
-  geom_nodelab(aes(label=label), hjust=-.05, size=3.5)  + 
-  ggplot2::xlim(0, 14) +
-  geom_rootedge() 
-#Make dataframe for clade nodes
-set1.2genclades.df <- data.frame(
-  clade=unique(set1.2gen_meta$group),
-  node=NA
-)
-#Find the most recent common ancestor for each clade
-for (i in 1:length(set1.2genclades.df$clade)) {
+  geom_tiplab(aes(colour=group), size=5, nudge_x = 0.2, align=TRUE ) + 
+  geom_nodelab(aes(label=label), hjust=-.05, size=5)  + 
+  theme(legend.position="left") +
+  ggplot2::xlim(0, 12) 
   
-  set1.2genclades.df$node[i] <- MRCA(
-    set1.2gen_tree,
-    set1.2gen_meta$ID[set1.2gen_meta$group == set1.2genclades.df$clade[i]]
-    )
+plot_tree_with_msa(t1, "set1.2_genomic_aln.fasta", regionlist, width=1.3, offset=10, spacing=0.007, bg_line = FALSE, tree_ratio=0.25)
+
+svg("set1.2_genomic_tree_aln.svg", width=40, height = 10)
+plot_tree_with_msa(t1, "set1.2_genomic_aln.fasta", regionlist, width=1.3, offset=10, spacing=0.007, bg_line = FALSE, tree_ratio=0.25)
+dev.off()
+
+
+```
+
+
+
+
+## set 1.3 hapista
+
+```{r, fig.width=50, fig.height = 30}
+#read tree
+set1.3hap_tree<-read.tree("set1.3_hapista_tree.nwk")
+
+#use plotly to identify root node and reset
+tn<-ggtree(set1.3hap_tree) + geom_tiplab()
+plotly::ggplotly(tn)
+
+set1.3hap_tree<-root(set1.3hap_tree, node=149) 
+
+# make metadata dataframe for this set of sequences
+set1.3hap_meta<-set1.3hap_tree$tip.label %>% as.data.frame() %>% set_colnames(c("ID")) %>%
+  mutate(., group = case_when(
+    str_detect(ID, paste(prymnesiales, collapse="|") ) ~ "Prymnesiales",
+    str_detect(ID, paste(isochrysidales, collapse="|") ) ~ "Isochrysidales",
+    str_detect(ID, paste(coccolithales, collapse="|") ) ~ "Coccolithales",
+    str_detect(ID, paste(syracosphaerales, collapse="|") ) ~ "syracosphaerales",
+    str_detect(ID, paste(pavlovales, collapse="|") ) ~ "Pavlovales",
+    str_detect(ID, paste(phaeocystales, collapse="|") ) ~ "Phaeocystales",
+    str_detect(ID, paste(ancoracysta, collapse="|") ) ~ "Ancoracysta",
+    str_detect(ID, paste(centroplasthelida, collapse="|") ) ~ "Centroplasthelida",
+    str_detect(ID, paste(diatoms, collapse="|") ) ~ "Diatoms",
+    str_detect(ID, paste(alveolata, collapse="|") ) ~ "Alveolata",
+    str_detect(ID, paste(foraminifera, collapse="|") ) ~ "Foraminifera",
+    str_detect(ID, paste(archaeplastida, collapse="|") ) ~ "Archaeplastida",
+    str_detect(ID, paste(telonema, collapse="|") ) ~ "Telonema",
+    str_detect(ID, paste(hemimastigophora , collapse="|") ) ~ "Hemimastigophora",
+    str_detect(ID, paste(discoba, collapse="|") ) ~ "Discoba",
+    str_detect(ID, paste(metamonida, collapse="|") ) ~ "Metamonida",
+    str_detect(ID, paste(ameobozoa, collapse="|") ) ~ "Ameobozoa",
+    str_detect(ID, paste(obozoa, collapse="|") ) ~ "Obozoa",
+    str_detect(ID, paste(Ancyromonadida, collapse="|") ) ~ "Ancyromonadida",
+    .default = "Obozoa"  )) %>%
+  mutate(., haptista = case_when(
+    str_detect(ID, paste(hapista, collapse="|") ) ~ "Hapista",
+  )) %>%
+  mutate(., calcifier = case_when(
+    str_detect(ID, paste(calcify, collapse="|") ) ~ "Calcifying",
+  ))
+
+#Get residue information from alignment
+
+set1.3aln<-readAAStringSet("set1.3_hapista_aln.fasta", format="fasta") #readd aln
+reference_seq <- as.character(set1.3aln[[2]]) #find human orai1
+
+patt_pore <- "Y-*L-*S-*R-*A-*K-*L-*K-*A-*S-*S-*R-*T-*S-*A-*L-*L-*S-*G-*F-*A-*M-*V-*A-*M-*V-*E-*V-*Q-*L-*D-*A-*D-*H-*D-*"
+patt_TM3<-"L-*A-*E-*V-*V-*"
+patt_TM4Pro<-"M-*V-*P-*F-*"
+patt_TM4ex<-"L-*V-*S-*H-*K-*T-*D-*R-*Q-*F-*Q-*E-*L-*N-*E-*L-*A-*E-*F-*A-*R-*L-*Q-*D-*Q-*L-*D-*H-*R-*G-*D-*"
+
+patterns<-c(patt_pore, patt_TM3, patt_TM4Pro, patt_TM4ex)
+  
+set1.3_regionlist<-list()
+i<-0
+for (p in patterns){
+  i <- i + 1
+  matches <- gregexpr(p, reference_seq, perl = TRUE)[[1]]
+  match_start <- min( unlist(lapply(matches, function(m) m:(m + ((nchar(p) + 2) / 3) - 1))) ) %>% as.double()
+  match_end <- match_start + ( attributes(matches) %>% .$match.length )
+  tm<-c(match_start, match_end)
+  set1.3_regionlist[[i]]<-tm
 }
 
 
-    # Trim the alignment to the specific columns
-trimmed_alignment <- AAStringSet(lapply(set1.2aln, function(seq) {
-    substring(seq, min(matched_columns), max(matched_columns))
-}))
+#Plot tree
 
- paste(substring(set1.2aln[[2]], min(matched_columns), max(matched_columns)), collapse = "")
+set1.3treeplot<-ggtree(set1.3hap_tree) %<+% set1.3hap_meta +
+  geom_tippoint(aes(color=group), size=1.5) +
+  geom_tiplab(aes(colour=group), size=5, nudge_x = 0.2, align=TRUE ) + 
+  geom_nodelab(aes(label=label), hjust=-.05, size=5)  + 
+  theme(legend.position="left") +
+  ggplot2::xlim(0, 20) 
+
+
+
+plot_tree_with_msa(set1.3treeplot, "set1.3_hapista_aln.fasta", set1.3_regionlist, width=1.3, offset=15, spacing=0.005, bg_line = FALSE, tree_ratio=0.35)
+
+```
+```{r}
+svg("set1.3_hapista_tree_aln.svg", width=50, height = 30)
+plot_tree_with_msa(set1.3treeplot, "set1.3_hapista_aln.fasta", set1.3_regionlist, width=1.3, offset=40, spacing=0.007, bg_line = FALSE, tree_ratio=0.35)
+dev.off()
+```
+
+# set1.0 all seqs
+
+```{r, fig.width=50, fig.height = 30}
+#read tree
+set1.0all_tree<-read.tree("set1.0_tree.nwk")
+
+#use plotly to identify root node and reset
+tn<-ggtree(set1.0all_tree) + geom_tiplab()
+plotly::ggplotly(tn)
+
+set1.0all_tree<-root(set1.0all_tree, node=163) 
+
+# make metadata dataframe for this set of sequences
+set1.0all_meta<-set1.0all_tree$tip.label %>% as.data.frame() %>% set_colnames(c("ID")) %>%
+  mutate(., group = case_when(
+    str_detect(ID, paste(prymnesiales, collapse="|") ) ~ "Prymnesiales",
+    str_detect(ID, paste(isochrysidales, collapse="|") ) ~ "Isochrysidales",
+    str_detect(ID, paste(coccolithales, collapse="|") ) ~ "Coccolithales",
+    str_detect(ID, paste(syracosphaerales, collapse="|") ) ~ "syracosphaerales",
+    str_detect(ID, paste(pavlovales, collapse="|") ) ~ "Pavlovales",
+    str_detect(ID, paste(phaeocystales, collapse="|") ) ~ "Phaeocystales",
+    str_detect(ID, paste(ancoracysta, collapse="|") ) ~ "Ancoracysta",
+    str_detect(ID, paste(centroplasthelida, collapse="|") ) ~ "Centroplasthelida",
+    str_detect(ID, paste(diatoms, collapse="|") ) ~ "Diatoms",
+    str_detect(ID, paste(alveolata, collapse="|") ) ~ "Alveolata",
+    str_detect(ID, paste(foraminifera, collapse="|") ) ~ "Foraminifera",
+    str_detect(ID, paste(archaeplastida, collapse="|") ) ~ "Archaeplastida",
+    str_detect(ID, paste(telonema, collapse="|") ) ~ "Telonema",
+    str_detect(ID, paste(hemimastigophora , collapse="|") ) ~ "Hemimastigophora",
+    str_detect(ID, paste(discoba, collapse="|") ) ~ "Discoba",
+    str_detect(ID, paste(metamonida, collapse="|") ) ~ "Metamonida",
+    str_detect(ID, paste(ameobozoa, collapse="|") ) ~ "Ameobozoa",
+    str_detect(ID, paste(obozoa, collapse="|") ) ~ "Obozoa",
+    str_detect(ID, paste(Ancyromonadida, collapse="|") ) ~ "Ancyromonadida",
+    .default = "Obozoa"  )) %>%
+  mutate(., haptista = case_when(
+    str_detect(ID, paste(hapista, collapse="|") ) ~ "Hapista",
+  )) %>%
+  mutate(., calcifier = case_when(
+    str_detect(ID, paste(calcify, collapse="|") ) ~ "Calcifying",
+  ))
+
+#Get residue information from alignment
+
+set1.0aln<-readAAStringSet("set1.0_aln.fasta", format="fasta") #readd aln
+reference_seq <- as.character(set1.0aln[[2]]) #find human orai1
+
+patt_pore <- "Y-*L-*S-*R-*A-*K-*L-*K-*A-*S-*S-*R-*T-*S-*A-*L-*L-*S-*G-*F-*A-*M-*V-*A-*M-*V-*E-*V-*Q-*L-*D-*A-*D-*H-*D-*"
+patt_TM3<-"L-*A-*E-*V-*V-*"
+patt_TM4Pro<-"M-*V-*P-*F-*"
+patt_TM4ex<-"L-*V-*S-*H-*K-*T-*D-*R-*Q-*F-*Q-*E-*L-*N-*E-*L-*A-*E-*F-*A-*R-*L-*Q-*D-*Q-*L-*D-*H-*R-*G-*D-*"
+
+patterns<-c(patt_pore, patt_TM3, patt_TM4Pro, patt_TM4ex)
+  
+set1.0_regionlist<-list()
+i<-0
+for (p in patterns){
+  i <- i + 1
+  matches <- gregexpr(p, reference_seq, perl = TRUE)[[1]]
+  match_start <- min( unlist(lapply(matches, function(m) m:(m + ((nchar(p) + 2) / 3) - 1))) ) %>% as.double()
+  match_end <- match_start + ( attributes(matches) %>% .$match.length )
+  tm<-c(match_start, match_end)
+  set1.0_regionlist[[i]]<-tm
+}
+
+set1.0_regionlist[[1]]<-c(8,107)
+set1.0_regionlist[[4]]<-c(520,556)
+
+#Plot tree
+
+set1.0treeplot<-ggtree(set1.0all_tree) %<+% set1.0all_meta +
+  geom_tippoint(aes(color=group), size=1.5) +
+  geom_tiplab(aes(colour=group), size=5, nudge_x = 0.2, align=TRUE ) + 
+  geom_nodelab(aes(label=label), hjust=-.05, size=5)  + 
+  theme(legend.position="left") +
+  ggplot2::xlim(0, 8) 
+
+
+
+plot_tree_with_msa(set1.0treeplot, "set1.0_aln.fasta", set1.0_regionlist, width=1.3, offset=15, spacing=0.05, bg_line = FALSE, tree_ratio=0.4)
+
+#set1.0treeplot$data$label
+#set1.0aln$
+
 
 ```
 
+
+
+```{r}
+
+svglite("set1.0_all_tree_aln.svg", width=100, height = 40)
+plot_tree_with_msa(set1.0treeplot, "set1.0_aln.fasta", set1.0_regionlist, width=2, offset=0, spacing=10, bg_line = FALSE, tree_ratio=0.4)
+dev.off()
+
+svg("set1.0_all_tree_aln.svg", width=100, height = 40)
+plot_tree_with_msa(set1.0treeplot, "set1.0_aln.fasta", set1.0_regionlist, width=2, offset=0, spacing=10, bg_line = FALSE, tree_ratio=0.4)
+dev.off()
+```
+python3 /opt/inkscape/usr/share/inkscape/extensions/ungroup_deep.py  set1.0_all_tree_aln.svg > set1.0_all_tree_aln_fig.svg
+
+
+# set 2.0 all seqs
+
+
+
+```{r, fig.width=100, fig.height = 100}
+#read tree
+set2.0all_tree<-read.tree("set2.0_tree.nwk")
+
+#use plotly to identify root node and reset
+tn<-ggtree(set2.0all_tree) + geom_tiplab()
+plotly::ggplotly(tn)
+#root ok
+#set2.0all_tree<-root(set2.0all_tree, node=163) 
+
+# make metadata dataframe for this set of sequences
+set2.0all_meta<-set2.0all_tree$tip.label %>% as.data.frame() %>% set_colnames(c("ID")) %>%
+  mutate(., group = case_when(
+    str_detect(ID, paste(prymnesiales, collapse="|") ) ~ "Prymnesiales",
+    str_detect(ID, paste(isochrysidales, collapse="|") ) ~ "Isochrysidales",
+    str_detect(ID, paste(coccolithales, collapse="|") ) ~ "Coccolithales",
+    str_detect(ID, paste(syracosphaerales, collapse="|") ) ~ "syracosphaerales",
+    str_detect(ID, paste(pavlovales, collapse="|") ) ~ "Pavlovales",
+    str_detect(ID, paste(phaeocystales, collapse="|") ) ~ "Phaeocystales",
+    str_detect(ID, paste(ancoracysta, collapse="|") ) ~ "Ancoracysta",
+    str_detect(ID, paste(centroplasthelida, collapse="|") ) ~ "Centroplasthelida",
+    str_detect(ID, paste(diatoms, collapse="|") ) ~ "Diatoms",
+    str_detect(ID, paste(alveolata, collapse="|") ) ~ "Alveolata",
+    str_detect(ID, paste(foraminifera, collapse="|") ) ~ "Foraminifera",
+    str_detect(ID, paste(archaeplastida, collapse="|") ) ~ "Archaeplastida",
+    str_detect(ID, paste(telonema, collapse="|") ) ~ "Telonema",
+    str_detect(ID, paste(hemimastigophora , collapse="|") ) ~ "Hemimastigophora",
+    str_detect(ID, paste(discoba, collapse="|") ) ~ "Discoba",
+    str_detect(ID, paste(metamonida, collapse="|") ) ~ "Metamonida",
+    str_detect(ID, paste(ameobozoa, collapse="|") ) ~ "Ameobozoa",
+    str_detect(ID, paste(obozoa, collapse="|") ) ~ "Obozoa",
+    str_detect(ID, paste(Ancyromonadida, collapse="|") ) ~ "Ancyromonadida",
+    .default = "Obozoa"  )) %>%
+  mutate(., haptista = case_when(
+    str_detect(ID, paste(hapista, collapse="|") ) ~ "Hapista",
+  )) %>%
+  mutate(., calcifier = case_when(
+    str_detect(ID, paste(calcify, collapse="|") ) ~ "Calcifying",
+  ))
+
+#Get residue information from alignment
+
+set2.0aln<-readAAStringSet("set2.0_aln.fasta", format="fasta") #readd aln
+reference_seq <- as.character(set2.0aln[[3]]) #find human orai1
+
+patt_pore <- "Y-*L-*S-*R-*A-*K-*L-*K-*A-*S-*S-*R-*T-*S-*A-*L-*L-*S-*G-*F-*A-*M-*V-*A-*M-*V-*E-*V-*Q-*L-*D-*A-*D-*H-*D-*"
+patt_TM3<-"L-*A-*E-*V-*V-*"
+patt_TM4Pro<-"M-*V-*P-*F-*"
+patt_TM4ex<-"L-*V-*S-*H-*K-*T-*D-*R-*Q-*F-*Q-*E-*L-*N-*E-*L-*A"#-*E-*F-*A-*R-*L-*Q-*D-*Q-*L-*D-*H-*R-*G-*D-*
+
+patterns<-c(patt_pore, patt_TM3, patt_TM4Pro, patt_TM4ex)
+  
+set2.0_regionlist<-list()
+i<-0
+for (p in patterns){
+  i <- i + 1
+  matches <- gregexpr(p, reference_seq, perl = TRUE)[[1]]
+  match_start <- min( unlist(lapply(matches, function(m) m:(m + ((nchar(p) + 2) / 3) - 1))) ) %>% as.double()
+  match_end <- match_start + ( attributes(matches) %>% .$match.length )
+  tm<-c(match_start, match_end)
+  set2.0_regionlist[[i]]<-tm
+}
+
+#set2.0_regionlist[[1]]<-c(8,107)
+#set2.0_regionlist[[4]]<-c(520,556)
+
+#Plot tree
+
+
+palette <- viridis_pal(option = "D")(19) 
+palette<-c( "Diatoms"="#808000", "Ameobozoa"="#bfef45","Metamonida"="#42d4f4", "Archaeplastida"="#000075", "Obozoa"="#800000", "Ancyromonadida"="#aaffc3","Centroplasthelida"="#9A6324", "Isochrysidales"="#3cb44b", "Coccolithales"="#e6194B", "syracosphaerales"="#ffe119", "Prymnesiales"="#4363d8", "Phaeocystales"="#911eb4", "Pavlovales"="#f58231", "Telonema"="#469990", "Discoba"="#dcbeff", "Foraminifera"="#a9a9a9", "Hemimastigophora"="#ffd8b1", "Ancoracysta"="#fabed4", "Alveolata"="#f032e6")
+
+
+set2.0treeplot<-ggtree(set2.0all_tree) %<+% set2.0all_meta +
+  geom_tippoint(aes(color=group), size=1.5) +
+  geom_tiplab(aes(colour=group), size=5, nudge_x = 0.2, align=TRUE ) + 
+  scale_colour_manual(values=palette) +
+  geom_nodelab(aes(label=label), hjust=-.05, size=5)  + 
+  theme(legend.position="left") +
+  ggplot2::xlim(0, 12) 
+
+
+
+plot_tree_with_msa(set2.0treeplot, "set2.0_aln.fasta", set2.0_regionlist, width=1.3, offset=15, spacing=0.05, bg_line = FALSE, tree_ratio=0.4)
+
+#set2.0treeplot$data$label
+#set2.0aln$
+
+
+```
+
+```{r, fig.width=100, fig.height = 60}
+
+svglite("set2.0_all_tree_aln.svg", width=100, height = 60)
+plot_tree_with_msa(set2.0treeplot, "set2.0_aln.fasta", set2.0_regionlist, width=1.3, offset=15, spacing=0.05, bg_line = FALSE, tree_ratio=0.4)
+dev.off()
+
+
+```
+
+
+# separate plot objects with cowplot
 
 ```{r}
 # Define the amino acid chemical categories and corresponding colors
@@ -690,7 +945,8 @@ chem_categories <- list(
     "polar" = c("S", "T", "C", "Y", "N", "Q"),
     "basic" = c("K", "R", "H"),
     "acidic" = c("D", "E"),
-    "aromatic" = c("F", "W", "Y")
+    "aromatic" = c("F", "W", "Y"),
+    "space" = c("...")
 )
 
 chem_colors <- c(
@@ -700,7 +956,7 @@ chem_colors <- c(
     "acidic" = "red",
     "aromatic" = "purple",
     "-" = "white",  # gap
-    "..." = "white" # gap between regions
+    "space" = "grey" # gap between regions
 )
 
 # Function to categorize amino acids
@@ -711,11 +967,11 @@ categorize_amino_acid <- function(aa) {
             return(category)
         }
     }
-    return(NA)  # For any character that doesn't match (shouldn't happen)
+    return(NA)  # For any character that doesn't match
 }
 
 # Main function
-plot_tree_with_msa <- function(p, fasta, regions, offset = 0, width = 5, spacing = 0.2, color = NULL, bg_line = TRUE, height = 0.8, tree_ratio = 0.5) {
+plot_tree_with_msa <- function(p, fasta, regions, offset = 0, width = 5, spacing = 0.2, color = NULL, bg_line = TRUE, height = 0.8, tree_ratio = 0.5, text_size = 3) {
     if (missing(fasta)) {
         x <- NULL
     } else if (is(fasta, "DNAbin") || is(fasta, "AAbin")) {
@@ -728,7 +984,7 @@ plot_tree_with_msa <- function(p, fasta, regions, offset = 0, width = 5, spacing
    
     if (is.null(x) && is(p, "treedata") && length(p@tip_seq)) {
         x <- p@tip_seq
-        p <- ggtree(p) + geom_tiplab()
+        #p <- ggtree(p) + geom_tiplab()
     }
    
     if (is.null(x)) {
@@ -761,7 +1017,7 @@ plot_tree_with_msa <- function(p, fasta, regions, offset = 0, width = 5, spacing
         combined <- unlist(lapply(regions, function(region) {
             start <- region[1]
             end <- region[2]
-            c(seq[start:end], "...")
+            c(seq[start:end], "...", "...", "...")
         }))
         combined <- combined[-length(combined)] # Remove last "..."
         combined <- str_trim(combined)  # Remove trailing white spaces
@@ -773,7 +1029,7 @@ plot_tree_with_msa <- function(p, fasta, regions, offset = 0, width = 5, spacing
         aa_categories <- sapply(unique_aa, categorize_amino_acid)
         color <- chem_colors[aa_categories]
         names(color) <- unique_aa
-        color <- c(color, `-` = "white", `...` = "white")
+        color <- c(color, `-` = "white", `...` = "grey")
     }
    
     width_factor <- width * (df$x %>% range %>% diff) / length(combined_seqs[[1]])
@@ -807,28 +1063,28 @@ plot_tree_with_msa <- function(p, fasta, regions, offset = 0, width = 5, spacing
                               linewidth = h * 0.2, inherit.aes = FALSE)
     }
    
-    # Dynamically adjust text size based on MSA width
-    text_size <- min(3, 3 * length(slice) / 50)  # Adjust as needed
-   
     p_msa <- ggplot(msa_df, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = chem_category)) +
         geom_rect() +
         geom_text(aes(x = (xmin + xmax) / 2, y = (ymin + ymax) / 2, label = toupper(seq)),
                   size = text_size, inherit.aes = FALSE) +
-        scale_fill_manual(values = chem_colors, na.value = "white") +
-        theme_void() +
-        facet_wrap(~ name, ncol = 1, scales = "free_y")
+        scale_fill_manual(values = chem_colors, na.value = "white") + #where all the white is coming from!
+        theme_void() + 
+        theme(plot.margin=margin(t=0,r=0,b=0,l=0))
    
     combined_plot <- cowplot::plot_grid(
         p + theme(plot.margin = margin(r = 5)),
         p_msa + theme(plot.margin = margin(l = 5)),
+        align = "h",
         rel_widths = c(tree_ratio, 1 - tree_ratio)
     )
-   
+    #return(msa_df)
+    #return(p_msa)
     return(combined_plot)
 }
 ```
 
 
+# plot in same ggplot object
 
 ```{r}
 
@@ -973,13 +1229,144 @@ plot_tree_with_msa <- function(p, fasta, regions, offset = 0, width = 5, spacing
         geom_text(aes(x = (xmin + xmax) / 2, y = (ymin + ymax) / 2, label = toupper(seq)),
                   data = msa_df, inherit.aes = FALSE, size = text_size) +
         scale_fill_manual(values = chem_colors, na.value = "white")
-    browser()
-        gt = ggplot_gtable(ggplot_build(p))
-        gtcol<-gt$layout$l[grep('panel', gt$layout$name)] #
-        gt$widths[gtcol] = tree_ratio*gt$widths[gtcol] # set width to tree_ratio
-        p<-grid.draw(gt) # plot with grid draw
+    
+
     
     return(p)
+}
+
+```
+
+
+
+# Possible geom_fruit solution - doesn't quite work at present
+
+```{r}
+t1<-ggtree(set1.2gen_tree) %<+% set1.2gen_meta +
+  geom_tippoint(aes(color=group), size=1.5) +
+  geom_tiplab(aes(colour=group), size=2, nudge_x = 0.2, align=TRUE ) + 
+  geom_nodelab(aes(label=label), hjust=-.05, size=2.0)  + 
+  theme(legend.position="left") +
+  ggplot2::xlim(0, 9) 
+
+t1_msa_df<-make_msa_df(t1, "set1.2_genomic_aln.fasta", regionlist, width=1.3, offset=0.2, spacing=0.007, bg_line = FALSE, tree_ratio=0.2)
+
+t1 + new_scale_fill() +
+          geom_fruit(data=t1_msa_df, geom=geom_rect,
+             mapping=aes(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = chem_category))) +
+          geom_fruit(data=t1_msa_df, geom=geom_text,
+                     mapping=aes(aes(x = (xmin + xmax) / 2, y = (ymin + ymax) / 2, label = toupper(seq))), size=text_size) +
+          scale_fill_manual(values = chem_colors, na.value = "white")
+
+                                 
+                                
+
+###subs
+
+
+# Define the amino acid chemical categories and corresponding colors
+chem_categories <- list(
+    "nonpolar" = c("A", "V", "L", "I", "M", "F", "W", "P", "G"),
+    "polar" = c("S", "T", "C", "Y", "N", "Q"),
+    "basic" = c("K", "R", "H"),
+    "acidic" = c("D", "E"),
+    "aromatic" = c("F", "W", "Y")
+)
+
+chem_colors <- c(
+    "nonpolar" = "gold",
+    "polar" = "green",
+    "basic" = "blue",
+    "acidic" = "red",
+    "aromatic" = "purple",
+    "-" = "white",  # gap
+    "..." = "white" # gap between regions
+)
+
+# Function to categorize amino acids
+categorize_amino_acid <- function(aa) {
+    aa <- toupper(aa)
+    for (category in names(chem_categories)) {
+        if (aa %in% chem_categories[[category]]) {
+            return(category)
+        }
+    }
+    return(NA)  # For any character that doesn't match (shouldn't happen)
+}
+
+# function to make msa dataframe
+make_msa_df <- function(p, fasta, regions, offset = 0, width = 5, spacing = 0.2, color = NULL, bg_line = TRUE, height = 0.8, tree_ratio = 0.5, text_size=3) {
+
+    x <- treeio::read.fasta(fasta)
+    x <- as.matrix(x)
+   
+    if (!all(labels(x) %in% p$data$label)) {
+        stop("taxa name in input sequences do not match with the ones on the tree, please check your input files...")
+    }
+   
+    if (is.null(regions)) {
+        stop("Please provide a list of regions to display.")
+    }
+   
+    df <- p$data
+    df <- df[df$isTip, ]
+    seqs <- lapply(1:nrow(x), function(i) {
+        seq <- as.vector(as.character(x[i, ]))
+        seq[seq == "?"] <- "-"
+        seq[seq == "*"] <- "-"
+        seq[seq == " "] <- "-"
+        return(seq)
+    })
+    names(seqs) <- labels(x)
+    seqs <- seqs[df$label[order(df$y)]]
+   
+    combined_seqs <- lapply(seqs, function(seq) {
+        combined <- unlist(lapply(regions, function(region) {
+            start <- region[1]
+            end <- region[2]
+            c(seq[start:end], "...")
+        }))
+        combined <- combined[-length(combined)] # Remove last "..."
+        combined <- str_trim(combined)  # Remove trailing white spaces
+        return(combined)
+    })
+   
+    if (is.null(color)) {
+        unique_aa <- unique(unlist(combined_seqs))
+        aa_categories <- sapply(unique_aa, categorize_amino_acid)
+        color <- chem_colors[aa_categories]
+        names(color) <- unique_aa
+        color <- c(color, `-` = "white", `...` = "white")
+    }
+   
+    # Compute width factors based on tree_ratio
+    tree_width <- max(df$x) * tree_ratio
+    msa_width <- tree_width / tree_ratio * (1 - tree_ratio)
+   
+    width_factor <- width * (df$x %>% range %>% diff) / length(combined_seqs[[1]])
+    y <- sort(df$y)
+    h <- ceiling(diff(range(df$y)) / length(df$y))
+    height_factor <- height / 2 * h
+   
+    slice <- seq_along(combined_seqs[[1]])
+    xmax <- tree_width + offset + seq_along(slice) * (width_factor + spacing)
+    xmin <- xmax - (width_factor + spacing)
+    ymin <- y - height_factor
+    ymax <- y + height_factor
+   
+    msa_df <- do.call("rbind", lapply(1:length(y), function(i) {
+        data.frame(
+            name = names(combined_seqs)[i],
+            xmin = xmin,
+            xmax = xmax,
+            ymin = ymin[i],
+            ymax = ymax[i],
+            seq = combined_seqs[[i]],
+            chem_category = sapply(combined_seqs[[i]], categorize_amino_acid)
+        )
+    }))
+   
+    return(msa_df)
 }
 
 ```
@@ -987,6 +1374,11 @@ plot_tree_with_msa <- function(p, fasta, regions, offset = 0, width = 5, spacing
 ```{r}
 library(gtable)
 library(grid)
+
+        gt = ggplot_gtable(ggplot_build(p))
+        gtcol<-gt$layout$l[grep('panel', gt$layout$name)] #
+        gt$widths[gtcol] = tree_ratio*gt$widths[gtcol] # set width to tree_ratio
+        p<-grid.draw(gt) # plot with grid draw
 ```
 
 
@@ -1218,7 +1610,7 @@ seqkit subseq -r 557:1262 set1_initial_aln.fasta > set1_initial_aln_trim.fasta
 #remove aln positions:
 sed -r 's/-//g' set1_initial_aln_trim.fasta | seqtk seq > set1_initial_aln_trim_tidy.fasta
 
-
+geom_fruit
 ```
 
 
